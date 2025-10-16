@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import init_db, close_db
 from app.core.config import settings
 from app.api import api_router, page_router
+from app.api.registry_auth import router as registry_auth_router
+from app.api.registry_proxy import router as registry_proxy_router
 from app.utils.init_data import initialize_default_data
 
 
@@ -51,6 +53,8 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Include routers
+app.include_router(registry_auth_router)  # Registry token auth at root level
+app.include_router(registry_proxy_router)  # Registry API proxy with permission check
 app.include_router(api_router, prefix="/api")
 app.include_router(page_router)
 

@@ -53,6 +53,13 @@ class RegistryService:
                 auth=self.auth,
                 timeout=30.0
             )
+            
+            # Handle repository not found (404) gracefully
+            if response.status_code == 404:
+                # Repository doesn't exist, return empty list
+                self._cache[cache_key] = []
+                return []
+            
             response.raise_for_status()
             data = response.json()
             tags = data.get("tags", [])
