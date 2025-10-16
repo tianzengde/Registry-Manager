@@ -1,4 +1,4 @@
-"""Docker Registry API Proxy with Permission Check"""
+"""Docker Registry API 代理，带权限检查"""
 import httpx
 from typing import Optional
 from fastapi import APIRouter, HTTPException, status, Request, Response, Depends
@@ -15,28 +15,33 @@ auth_service = AuthService()
 
 
 async def get_user_from_token(request: Request) -> Optional[User]:
-    """Extract and validate user from Bearer token"""
+    """从 Bearer token 中提取并验证用户"""
     auth_header = request.headers.get("Authorization", "")
     
+    # 调试：打印所有请求头，查看 Docker 客户端发送的内容
+    print(f"[DEBUG] Request headers: {dict(request.headers)}")
+    print(f"[DEBUG] Authorization header: {auth_header}")
+    
     if not auth_header.startswith("Bearer "):
+        print(f"[DEBUG] No Bearer token found in Authorization header")
         return None
     
     token = auth_header.replace("Bearer ", "")
     
-    # Try to decode the token
+    # 尝试解码 token
     try:
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
             algorithms=[settings.ALGORITHM],
-            options={"verify_aud": False}  # Don't verify audience for Docker Registry tokens
+            options={"verify_aud": False}  # 不验证 audience，适用于 Docker Registry tokens
         )
     except JWTError:
         return None
     
-    # Extract username from token (supports both formats)
-    # Docker Registry token format uses "sub" field
-    # Our web app token also uses "sub" field
+    # 从 token 中提取用户名（支持两种格式）
+    # Docker Registry token 格式使用 "sub" 字段
+    # 我们的 web 应用 token 也使用 "sub" 字段
     username = payload.get("sub")
     if not username:
         return None
@@ -47,8 +52,8 @@ async def get_user_from_token(request: Request) -> Optional[User]:
 
 def parse_repository_from_path(path: str) -> Optional[str]:
     """
-    Extract repository name from Docker Registry API path
-    Examples:
+    从 Docker Registry API 路径中提取仓库名称
+    示例:
       /v2/nginx/manifests/latest -> nginx
       /v2/myapp/blobs/sha256:xxx -> myapp
       /v2/namespace/repo/tags/list -> namespace/repo
@@ -56,20 +61,20 @@ def parse_repository_from_path(path: str) -> Optional[str]:
     if not path.startswith("/v2/"):
         return None
     
-    # Remove /v2/ prefix
+    # 移除 /v2/ 前缀
     path = path[4:]
     
-    # Split by /
+    # 按 / 分割
     parts = path.split("/")
     
     if len(parts) == 0 or parts[0] == "" or parts[0] == "_catalog":
         return None
     
-    # For paths like: nginx/manifests/latest or nginx/blobs/xxx
-    # Repository name can have multiple parts (namespace/repo)
-    # But typically ends before /manifests/, /blobs/, /tags/
+    # 对于路径如: nginx/manifests/latest 或 nginx/blobs/xxx
+    # 仓库名称可以有多个部分 (namespace/repo)
+    # 但通常在 /manifests/, /blobs/, /tags/ 之前结束
     
-    # Find the index of the registry API endpoint
+    # 查找 registry API 端点的索引
     api_endpoints = ["manifests", "blobs", "tags", "uploads"]
     repo_parts = []
     
@@ -79,14 +84,14 @@ def parse_repository_from_path(path: str) -> Optional[str]:
             break
     
     if not repo_parts:
-        # Maybe it's just the repository name
+        # 可能只是仓库名称
         repo_parts = [parts[0]]
     
     return "/".join(repo_parts) if repo_parts else None
 
 
 def determine_action(method: str, path: str) -> str:
-    """Determine the action (pull/push/delete) based on HTTP method and path"""
+    """根据 HTTP 方法和路径确定操作类型 (pull/push/delete)"""
     if method == "GET" or method == "HEAD":
         return "pull"
     elif method == "POST" or method == "PUT" or method == "PATCH":
@@ -94,32 +99,32 @@ def determine_action(method: str, path: str) -> str:
     elif method == "DELETE":
         return "delete"
     else:
-        return "pull"  # Default to pull for unknown methods
+        return "pull"  # 对于未知方法，默认为 pull
 
 
 @router.api_route("/v2/{path:path}", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def registry_proxy(request: Request, path: str):
     """
-    Proxy all Docker Registry API requests through permission checking
+    代理所有 Docker Registry API 请求，进行权限检查
     """
     full_path = f"/v2/{path}" if path else "/v2/"
     
-    # Handle OPTIONS for CORS
+    # 处理 OPTIONS 请求（CORS）
     if request.method == "OPTIONS":
         return Response(status_code=200)
     
-    # Special handling for /v2/ base endpoint (registry version check)
+    # 特殊处理 /v2/ 基础端点（registry 版本检查）
     if full_path == "/v2/" or full_path == "/v2":
-        # Check if user is authenticated
+        # 检查用户是否已认证
         user = await get_user_from_token(request)
         if not user:
-            # Build dynamic realm URL based on request
+            # 根据请求构建动态 realm URL
             host = request.headers.get("host", "127.0.0.1:3081")
-            # Use X-Forwarded-Proto if set by reverse proxy
+            # 如果反向代理设置了 X-Forwarded-Proto，则使用它
             scheme = request.headers.get("x-forwarded-proto", "http")
             realm_url = f"{scheme}://{host}/token"
             
-            # Return 401 with authentication challenge
+            # 返回 401 认证挑战
             return Response(
                 status_code=401,
                 headers={
@@ -128,7 +133,7 @@ async def registry_proxy(request: Request, path: str):
                 },
                 content=b'{"errors":[{"code":"UNAUTHORIZED","message":"authentication required"}]}'
             )
-        # Authenticated, return success
+        # 已认证，返回成功
         return Response(
             status_code=200,
             headers={
@@ -138,7 +143,7 @@ async def registry_proxy(request: Request, path: str):
             content=b'{}'
         )
     
-    # Catalog endpoint - admin only
+    # 目录端点 - 仅管理员
     if "_catalog" in full_path:
         user = await get_user_from_token(request)
         if not user or not user.is_admin:
@@ -146,7 +151,7 @@ async def registry_proxy(request: Request, path: str):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin access required"
             )
-        # Admin can access catalog
+        # 管理员可以访问目录
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{settings.REGISTRY_URL}{full_path}",
@@ -158,19 +163,19 @@ async def registry_proxy(request: Request, path: str):
                 headers=dict(response.headers)
             )
     
-    # Extract repository name
+    # 提取仓库名称
     repo_name = parse_repository_from_path(full_path)
     if not repo_name:
-        # Can't determine repository, deny access
+        # 无法确定仓库，拒绝访问
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid repository path"
         )
     
-    # Get user from token
+    # 从 token 中获取用户
     user = await get_user_from_token(request)
     if not user:
-        # Build dynamic realm URL based on request
+        # 根据请求构建动态 realm URL
         host = request.headers.get("host", "127.0.0.1:3081")
         scheme = request.headers.get("x-forwarded-proto", "http")
         realm_url = f"{scheme}://{host}/token"
@@ -183,14 +188,14 @@ async def registry_proxy(request: Request, path: str):
             }
         )
     
-    # Determine action
+    # 确定操作类型
     action = determine_action(request.method, full_path)
     
-    # Get or create repository in database
+    # 从数据库中获取或创建仓库
     repo = await Repository.get_or_none(name=repo_name)
     if not repo:
-        # Repository doesn't exist in DB
-        # Allow admin to create it via push
+        # 仓库在数据库中不存在
+        # 允许管理员通过推送创建
         if user.is_admin and action == "push":
             repo = await Repository.create(
                 name=repo_name,
@@ -203,7 +208,7 @@ async def registry_proxy(request: Request, path: str):
                 detail="Repository not found"
             )
     
-    # Check permission
+    # 检查权限
     has_permission = await permission_service.check_permission(user, repo, action)
     if not has_permission:
         raise HTTPException(
@@ -211,14 +216,14 @@ async def registry_proxy(request: Request, path: str):
             detail=f"No {action} permission for repository {repo_name}"
         )
     
-    # Permission granted, proxy request to actual registry
+    # 权限已授予，代理请求到实际的 registry
     async with httpx.AsyncClient() as client:
-        # Prepare request
+        # 准备请求
         headers = dict(request.headers)
-        # Remove host header to avoid conflicts
+        # 移除 host 头以避免冲突
         headers.pop("host", None)
         
-        # Forward request to registry
+        # 转发请求到 registry
         try:
             if request.method in ["POST", "PUT", "PATCH"]:
                 body = await request.body()
@@ -239,17 +244,17 @@ async def registry_proxy(request: Request, path: str):
                     params=dict(request.query_params)
                 )
             
-            # Rewrite Location header if present (for blob uploads)
+            # 如果存在 Location 头，则重写它（用于 blob 上传）
             headers = dict(response.headers)
             if "location" in headers:
-                # Rewrite internal registry URL to external URL
+                # 将内部 registry URL 重写为外部 URL
                 location = headers["location"]
                 print(f"[DEBUG] Original Location: {location[:100]}...")
                 print(f"[DEBUG] REGISTRY_URL: {settings.REGISTRY_URL}")
                 print(f"[DEBUG] Request headers - Host: {request.headers.get('host')}, X-Forwarded-Proto: {request.headers.get('x-forwarded-proto')}")
                 
                 if settings.REGISTRY_URL in location:
-                    # Replace internal URL with external URL
+                    # 将内部 URL 替换为外部 URL
                     host = request.headers.get("host", "127.0.0.1:3081")
                     scheme = request.headers.get("x-forwarded-proto", "http")
                     external_base = f"{scheme}://{host}"
@@ -257,7 +262,7 @@ async def registry_proxy(request: Request, path: str):
                     headers["location"] = location
                     print(f"[DEBUG] Scheme: {scheme}, Rewritten Location: {location[:100]}...")
             
-            # Return response
+            # 返回响应
             return Response(
                 content=response.content,
                 status_code=response.status_code,
