@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}用户管理 - Docker Registry Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>用户管理</h1>
+    <button onclick="showCreateUserModal()" class="btn btn-primary">创建用户</button>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <table class="data-table" id="users-table">
+            <thead>
+                <tr>
+                    <th>用户名</th>
+                    <th>邮箱</th>
+                    <th>类型</th>
+                    <th>状态</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="6" class="loading">加载中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create User Modal -->
+<div id="createUserModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>创建新用户</h2>
+            <span class="close" onclick="closeCreateUserModal()">&times;</span>
+        </div>
+        <form onsubmit="createUser(event)">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="new-username">用户名 *</label>
+                    <input type="text" id="new-username" required>
+                </div>
+                <div class="form-group">
+                    <label for="new-email">邮箱</label>
+                    <input type="email" id="new-email">
+                </div>
+                <div class="form-group">
+                    <label for="new-password">密码 *</label>
+                    <input type="password" id="new-password" required minlength="6">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeCreateUserModal()" class="btn">取消</button>
+                <button type="submit" class="btn btn-primary">创建</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadUsers();
+});
+
+async function loadUsers() {
+    try {
+        const users = await apiRequest('/api/users/');
+        const tbody = document.querySelector('#users-table tbody');
+        
+        tbody.innerHTML = users.map(user => `
+            <tr>
+                <td>${user.username}</td>
+                <td>${user.email || '-'}</td>
+                <td>${user.is_admin ? '<span class="badge badge-primary">管理员</span>' : '<span class="badge badge-secondary">普通用户</span>'}</td>
+                <td>${user.is_active ? '<span class="badge badge-success">激活</span>' : '<span class="badge badge-danger">禁用</span>'}</td>
+                <td>${new Date(user.created_at).toLocaleDateString('zh-CN')}</td>
+                <td>
+                    ${user.username !== 'admin' ? `
+                        <button onclick="toggleUserStatus(${user.id}, ${user.is_active})" class="btn btn-sm">
+                            ${user.is_active ? '禁用' : '激活'}
+                        </button>
+                        <button onclick="deleteUser(${user.id}, '${user.username}')" class="btn btn-sm btn-danger">删除</button>
+                    ` : '<span>-</span>'}
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('Failed to load users:', error);
+    }
+}
+
+function showCreateUserModal() {
+    document.getElementById('createUserModal').style.display = 'block';
+}
+
+function closeCreateUserModal() {
+    document.getElementById('createUserModal').style.display = 'none';
+    document.getElementById('new-username').value = '';
+    document.getElementById('new-email').value = '';
+    document.getElementById('new-password').value = '';
+}
+
+async function createUser(event) {
+    event.preventDefault();
+    
+    const username = document.getElementById('new-username').value;
+    const email = document.getElementById('new-email').value;
+    const password = document.getElementById('new-password').value;
+    
+    try {
+        await apiRequest('/api/users/', {
+            method: 'POST',
+            body: JSON.stringify({ username, email, password })
+        });
+        
+        closeCreateUserModal();
+        await loadUsers();
+        alert('用户创建成功');
+    } catch (error) {
+        alert('创建用户失败: ' + error.message);
+    }
+}
+
+async function toggleUserStatus(userId, currentStatus) {
+    try {
+        await apiRequest(`/api/users/${userId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ is_active: !currentStatus })
+        });
+        
+        await loadUsers();
+    } catch (error) {
+        alert('操作失败: ' + error.message);
+    }
+}
+
+async function deleteUser(userId, username) {
+    if (!confirm(`确定要删除用户 "${username}" 吗？`)) {
+        return;
+    }
+    
+    try {
+        await apiRequest(`/api/users/${userId}`, { method: 'DELETE' });
+        await loadUsers();
+        alert('用户已删除');
+    } catch (error) {
+        alert('删除失败: ' + error.message);
+    }
+}
+</script>
+{% endblock %}

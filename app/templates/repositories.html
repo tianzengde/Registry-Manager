@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}仓库列表 - Docker Registry Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>仓库列表</h1>
+    <button onclick="syncFromRegistry()" class="btn btn-primary admin-only">从 Registry 同步</button>
+</div>
+
+<div class="filter-bar">
+    <input type="text" id="search-input" placeholder="搜索仓库..." onkeyup="filterRepositories()">
+    <select id="filter-type" onchange="filterRepositories()">
+        <option value="all">全部</option>
+        <option value="public">公开</option>
+        <option value="private">私有</option>
+    </select>
+</div>
+
+<div id="repo-grid" class="repo-grid">
+    <p class="loading">加载中...</p>
+</div>
+
+<script>
+let allRepos = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadRepositories();
+});
+
+async function loadRepositories() {
+    try {
+        allRepos = await apiRequest('/api/repositories/');
+        displayRepositories(allRepos);
+    } catch (error) {
+        console.error('Failed to load repositories:', error);
+        document.getElementById('repo-grid').innerHTML = '<p class="error">加载失败: ' + error.message + '</p>';
+    }
+}
+
+function displayRepositories(repos) {
+    const grid = document.getElementById('repo-grid');
+    
+    if (repos.length === 0) {
+        grid.innerHTML = '<p>没有可访问的仓库。提示：管理员可以从 Registry 同步仓库。</p>';
+        return;
+    }
+    
+    grid.innerHTML = repos.map(repo => `
+        <div class="card repo-card">
+            <div class="card-header">
+                <h3>${repo.name}</h3>
+                ${repo.is_public ? '<span class="badge badge-success">公开</span>' : '<span class="badge badge-secondary">私有</span>'}
+            </div>
+            <div class="card-body">
+                <p>${repo.description || '暂无描述'}</p>
+            </div>
+            <div class="card-footer">
+                <a href="/repository/${repo.name}" class="btn btn-sm">查看详情</a>
+            </div>
+        </div>
+    `).join('');
+}
+
+function filterRepositories() {
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    const filterType = document.getElementById('filter-type').value;
+    
+    let filtered = allRepos;
+    
+    if (searchTerm) {
+        filtered = filtered.filter(repo => 
+            repo.name.toLowerCase().includes(searchTerm) ||
+            (repo.description && repo.description.toLowerCase().includes(searchTerm))
+        );
+    }
+    
+    if (filterType !== 'all') {
+        filtered = filtered.filter(repo => 
+            filterType === 'public' ? repo.is_public : !repo.is_public
+        );
+    }
+    
+    displayRepositories(filtered);
+}
+
+async function syncFromRegistry() {
+    if (!confirm('确定要从 Docker Registry 同步仓库吗？这将自动创建数据库中不存在的仓库记录。')) {
+        return;
+    }
+    
+    try {
+        // Clear cache first to get fresh data
+        try {
+            await apiRequest('/api/images/cache/clear', { method: 'POST' });
+        } catch (e) {
+            console.warn('Failed to clear cache:', e);
+        }
+        
+        // Get catalog from registry
+        const catalog = await apiRequest('/api/images/catalog');
+        
+        if (catalog.length === 0) {
+            alert('Registry 中没有仓库');
+            return;
+        }
+        
+        // Get existing repos in database
+        const existingRepos = await apiRequest('/api/repositories/');
+        const existingNames = existingRepos.map(r => r.name);
+        
+        // Create missing repos
+        let created = 0;
+        for (const repoName of catalog) {
+            if (!existingNames.includes(repoName)) {
+                try {
+                    await apiRequest('/api/repositories/', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            name: repoName,
+                            description: `从 Registry 同步: ${repoName}`,
+                            is_public: false
+                        })
+                    });
+                    created++;
+                } catch (error) {
+                    console.error(`Failed to create ${repoName}:`, error);
+                }
+            }
+        }
+        
+        alert(`同步完成！新创建 ${created} 个仓库记录。`);
+        await loadRepositories();
+    } catch (error) {
+        alert('同步失败: ' + error.message);
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block title %}{{ repo_name }} - Docker Registry Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <a href="/repositories" class="back-link">← 返回仓库列表</a>
+        <h1 id="repo-name">{{ repo_name }}</h1>
+    </div>
+</div>
+
+<div class="repo-info card">
+    <div class="card-body">
+        <p><strong>仓库名称:</strong> <span id="repo-name-display">{{ repo_name }}</span></p>
+        <p><strong>访问类型:</strong> <span id="repo-type">-</span></p>
+        <p><strong>标签数量:</strong> <span id="tag-count">-</span></p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>镜像标签</h3>
+    </div>
+    <div class="card-body">
+        <div id="tags-list" class="tags-list">
+            <p class="loading">加载中...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Image Detail Modal -->
+<div id="imageModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2 id="modal-image-title">镜像详情</h2>
+            <span class="close" onclick="closeImageModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="image-details">
+                <p class="loading">加载中...</p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button onclick="closeImageModal()" class="btn">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const repoName = "{{ repo_name }}";
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadRepositoryDetails();
+});
+
+async function loadRepositoryDetails() {
+    try {
+        // Load repository info
+        const repos = await apiRequest('/api/repositories/');
+        const repo = repos.find(r => r.name === repoName);
+        
+        if (repo) {
+            document.getElementById('repo-type').innerHTML = 
+                repo.is_public ? '<span class="badge badge-success">公开</span>' : '<span class="badge badge-secondary">私有</span>';
+        }
+        
+        // Load tags - URL encode the repository name to handle special characters like /
+        const encodedRepo = encodeURIComponent(repoName).replace(/%2F/g, '/');
+        const tagsData = await apiRequest(`/api/images/${encodedRepo}/tags`);
+        const tags = tagsData.tags || [];
+        
+        document.getElementById('tag-count').textContent = tags.length;
+        
+        const tagsList = document.getElementById('tags-list');
+        if (tags.length === 0) {
+            tagsList.innerHTML = '<p>此仓库暂无镜像标签</p>';
+            return;
+        }
+        
+        tagsList.innerHTML = tags.map(tag => `
+            <div class="tag-item">
+                <div class="tag-info">
+                    <h4>${tag}</h4>
+                    <button onclick="showPullCommand('${tag}')" class="btn btn-sm">📋 获取拉取命令</button>
+                </div>
+                <div class="tag-actions">
+                    <button onclick="showImageDetails('${tag}')" class="btn btn-sm btn-primary">查看详情</button>
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Failed to load repository details:', error);
+        document.getElementById('tags-list').innerHTML = '<p class="error">加载失败: ' + error.message + '</p>';
+    }
+}
+
+async function showPullCommand(tag) {
+    try {
+        // URL encode the repository name to handle special characters like /
+        const encodedRepo = encodeURIComponent(repoName).replace(/%2F/g, '/');
+        const response = await apiRequest(`/api/images/${encodedRepo}/${tag}/pull-command`);
+        
+        // Copy to clipboard with fallback
+        const command = response.command;
+        let copied = false;
+        
+        // Try modern clipboard API
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+                await navigator.clipboard.writeText(command);
+                copied = true;
+            } catch (e) {
+                console.warn('Clipboard API failed, using fallback');
+            }
+        }
+        
+        // Fallback: Create a temporary textarea
+        if (!copied) {
+            const textarea = document.createElement('textarea');
+            textarea.value = command;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                copied = true;
+            } catch (e) {
+                console.error('Fallback copy failed:', e);
+            }
+            document.body.removeChild(textarea);
+        }
+        
+        // Show notification
+        if (copied) {
+            alert(`拉取命令已复制到剪贴板:\n\n${command}`);
+        } else {
+            // If copy failed, show the command for manual copy
+            const userInput = prompt('无法自动复制，请手动复制以下命令:', command);
+        }
+    } catch (error) {
+        console.error('Failed to get pull command:', error);
+        alert('获取拉取命令失败: ' + error.message);
+    }
+}
+
+async function showImageDetails(tag) {
+    document.getElementById('imageModal').style.display = 'block';
+    document.getElementById('modal-image-title').textContent = `${repoName}:${tag}`;
+    document.getElementById('image-details').innerHTML = '<p class="loading">加载中...</p>';
+    
+    try {
+        // URL encode the repository name to handle special characters like /
+        const encodedRepo = encodeURIComponent(repoName).replace(/%2F/g, '/');
+        const details = await apiRequest(`/api/images/${encodedRepo}/${tag}/details`);
+        
+        const sizeInMB = (details.size / 1024 / 1024).toFixed(2);
+        const layers = details.layers || [];
+        const env = details.env || [];
+        const labels = details.labels || {};
+        const history = details.history || [];
+        
+        document.getElementById('image-details').innerHTML = `
+            <div style="margin-bottom: 2rem;">
+                <h3 style="margin-bottom: 1rem;">基本信息</h3>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <strong>标签:</strong>
+                        <span>${details.repository}:${details.tag}</span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>镜像摘要:</strong>
+                        <span style="font-size: 0.85em; word-break: break-all;">${details.digest || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>支持架构:</strong>
+                        <span>${details.os || 'N/A'} / ${details.architecture || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>创建日期:</strong>
+                        <span>${details.created ? new Date(details.created).toLocaleString('zh-CN') : 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>大小:</strong>
+                        <span>${sizeInMB} MB</span>
+                    </div>
+                    ${details.user ? `
+                    <div class="detail-item">
+                        <strong>用户:</strong>
+                        <span>${details.user}</span>
+                    </div>
+                    ` : ''}
+                    ${details.workdir ? `
+                    <div class="detail-item">
+                        <strong>工作目录:</strong>
+                        <span>${details.workdir}</span>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+
+            ${Object.keys(labels).length > 0 ? `
+                <div style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">元数据标签 (${Object.keys(labels).length})</h3>
+                    <div style="background: var(--bg-color); padding: 1rem; border-radius: 0.5rem;">
+                        ${Object.entries(labels).map(([key, value]) => `
+                            <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+                                <div style="font-weight: 600; color: var(--primary-color); margin-bottom: 0.25rem;">${key}</div>
+                                <div style="word-break: break-all; font-size: 0.9em;">${value}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${env.length > 0 ? `
+                <div style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">环境变量</h3>
+                    <div class="detail-grid">
+                        ${env.map(envVar => {
+                            const [key, ...valueParts] = envVar.split('=');
+                            const value = valueParts.join('=');
+                            return `
+                                <div class="detail-item">
+                                    <strong>${key}:</strong>
+                                    <span style="word-break: break-all;">${value || '(未设置)'}</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${details.cmd || details.entrypoint ? `
+                <div style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">运行配置</h3>
+                    <div class="detail-grid">
+                        ${details.entrypoint ? `
+                            <div class="detail-item">
+                                <strong>入口点 (Entrypoint):</strong>
+                                <span><code>${Array.isArray(details.entrypoint) ? details.entrypoint.join(' ') : details.entrypoint}</code></span>
+                            </div>
+                        ` : ''}
+                        ${details.cmd ? `
+                            <div class="detail-item">
+                                <strong>命令 (CMD):</strong>
+                                <span><code>${Array.isArray(details.cmd) ? details.cmd.join(' ') : details.cmd}</code></span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${details.exposed_ports && details.exposed_ports.length > 0 ? `
+                <div style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">暴露端口</h3>
+                    <p>${details.exposed_ports.join(', ')}</p>
+                </div>
+            ` : ''}
+
+            ${details.volumes && details.volumes.length > 0 ? `
+                <div style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">数据卷</h3>
+                    <p>${details.volumes.join(', ')}</p>
+                </div>
+            ` : ''}
+
+            ${layers.length > 0 ? `
+                <div style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">层信息 (${layers.length} 层)</h3>
+                    <div class="layers-list">
+                        ${layers.map((layer, index) => `
+                            <div class="layer-item">
+                                <div>
+                                    <strong>[#${String(index).padStart(3, '0')}]</strong>
+                                    <span style="font-size: 0.85em; color: var(--text-secondary);">${layer.digest.substring(0, 20)}...</span>
+                                </div>
+                                <div>
+                                    <span>${layer.percentage.toFixed(2)}%</span>
+                                    <span>(${(layer.size / 1024 / 1024).toFixed(1)} MB)</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${history.length > 0 ? `
+                <div style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">构建记录 (${history.length} 步骤)</h3>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        ${history.map((h, index) => `
+                            <div style="padding: 0.75rem; margin-bottom: 0.5rem; background: var(--bg-color); border-radius: 0.25rem; border-left: 3px solid var(--primary-color);">
+                                <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 0.25rem;">
+                                    ${h.created ? new Date(h.created).toLocaleString('zh-CN') : '未知时间'}
+                                </div>
+                                <code style="font-size: 0.9em; display: block; word-break: break-all;">
+                                    ${h.created_by || '(无命令)'}
+                                </code>
+                                ${h.comment ? `<div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 0.25rem;">${h.comment}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+        `;
+    } catch (error) {
+        console.error('Failed to load image details:', error);
+        document.getElementById('image-details').innerHTML = '<p class="error">加载详情失败: ' + error.message + '</p>';
+    }
+}
+
+function closeImageModal() {
+    document.getElementById('imageModal').style.display = 'none';
+}
+</script>
+{% endblock %}

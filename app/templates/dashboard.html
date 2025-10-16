@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}仪表板 - Docker Registry Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>仪表板</h1>
+</div>
+
+<div class="dashboard-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3>📦 仓库统计</h3>
+        </div>
+        <div class="card-body">
+            <div class="stat-number" id="repo-count">-</div>
+            <p>可访问的仓库数量</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>🏷️ 镜像统计</h3>
+        </div>
+        <div class="card-body">
+            <div class="stat-number" id="image-count">-</div>
+            <p>总镜像标签数</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>🔐 权限信息</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>用户类型:</strong> <span id="user-type">-</span></p>
+            <p><strong>可推送仓库:</strong> <span id="push-repos">-</span></p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>🔗 Registry 状态</h3>
+        </div>
+        <div class="card-body">
+            <div class="status-indicator" id="registry-status">
+                <span class="status-dot"></span>
+                <span>检查中...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 2rem;">
+    <div class="card-header">
+        <h3>所有仓库</h3>
+    </div>
+    <div class="card-body">
+        <div id="recent-repos" class="repo-list" style="max-height: 600px; overflow-y: auto;">
+            <p class="loading">加载中...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadDashboard();
+});
+
+async function loadDashboard() {
+    try {
+        // Load user info and repositories in parallel
+        const [userInfo, repos] = await Promise.all([
+            apiRequest('/api/users/me'),
+            apiRequest('/api/repositories/')
+        ]);
+        
+        document.getElementById('user-type').textContent = userInfo.is_admin ? '管理员' : '普通用户';
+        document.getElementById('repo-count').textContent = repos.length;
+        
+        const repoList = document.getElementById('recent-repos');
+        repoList.innerHTML = '';
+        
+        if (repos.length === 0) {
+            repoList.innerHTML = '<p>暂无可访问的仓库</p>';
+            document.getElementById('image-count').textContent = '0';
+        } else {
+            // Show loading for all repos
+            repoList.innerHTML = '<p class="loading">正在加载仓库标签信息...</p>';
+            
+            // Load ALL repository tags in parallel (not just first 5)
+            const tagPromises = repos.map(repo => 
+                apiRequest(`/api/images/${encodeURIComponent(repo.name).replace(/%2F/g, '/')}/tags`)
+                    .then(tags => ({ repo, tags: tags.tags }))
+                    .catch(error => {
+                        console.error(`Failed to load tags for ${repo.name}:`, error);
+                        return { repo, tags: [] };
+                    })
+            );
+            
+            // Wait for all tag requests to complete
+            const allRepoTags = await Promise.all(tagPromises);
+            
+            // Calculate total images from ALL repos
+            const totalImages = allRepoTags.reduce((sum, item) => sum + item.tags.length, 0);
+            document.getElementById('image-count').textContent = totalImages;
+            
+            // Display all repos (not just first 5)
+            repoList.innerHTML = '';
+            for (const { repo, tags } of allRepoTags) {
+                const repoItem = document.createElement('div');
+                repoItem.className = 'repo-item';
+                repoItem.innerHTML = `
+                    <div>
+                        <strong>${repo.name}</strong>
+                        ${repo.is_public ? '<span class="badge badge-success">公开</span>' : '<span class="badge badge-secondary">私有</span>'}
+                    </div>
+                    <div>
+                        <span>${tags.length} 个标签</span>
+                        <a href="/repository/${repo.name}" class="btn btn-sm">查看详情</a>
+                    </div>
+                `;
+                repoList.appendChild(repoItem);
+            }
+        }
+        
+        document.getElementById('push-repos').textContent = userInfo.is_admin ? '所有' : '-';
+        
+        // Check registry status
+        const statusEl = document.getElementById('registry-status');
+        statusEl.innerHTML = '<span class="status-dot status-success"></span><span>运行正常</span>';
+        
+    } catch (error) {
+        console.error('Failed to load dashboard:', error);
+        document.getElementById('recent-repos').innerHTML = '<p class="error">加载失败: ' + error.message + '</p>';
+    }
+}
+</script>
+{% endblock %}
