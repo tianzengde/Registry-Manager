@@ -1,4 +1,4 @@
-"""HTML page routes"""
+"""HTML页面路由"""
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -12,19 +12,19 @@ templates = Jinja2Templates(directory="app/templates")
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Redirect to login page"""
+    """重定向到登录页面"""
     return templates.TemplateResponse("login.html", {"request": request})
 
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    """Login page"""
+    """登录页面"""
     return templates.TemplateResponse("login.html", {"request": request})
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
-    """Dashboard page - requires authentication via frontend"""
+    """仪表板页面 - 需要通过前端进行身份验证"""
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
 

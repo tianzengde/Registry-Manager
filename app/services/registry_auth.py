@@ -1,4 +1,4 @@
-"""Docker Registry Token Authentication Service"""
+"""Docker Registry令牌认证服务"""
 from datetime import datetime, timedelta
 from typing import List, Optional
 from jose import jwt
@@ -8,7 +8,7 @@ from app.services.permission import PermissionService
 
 
 class RegistryAuthService:
-    """Service for Docker Registry Token Authentication"""
+    """Docker Registry令牌认证服务"""
     
     def __init__(self):
         self.permission_service = PermissionService()
@@ -21,25 +21,25 @@ class RegistryAuthService:
         scope: Optional[str] = None
     ) -> str:
         """
-        Generate Docker Registry JWT token
+        生成Docker Registry JWT令牌
         
-        Scope format: repository:namespace/repo:pull,push
+        作用域格式: repository:namespace/repo:pull,push
         """
-        # Parse scope to determine permissions
+        # 解析作用域以确定权限
         access_list = []
         
         if scope:
-            # Parse scope: "repository:nginx:pull,push"
+            # 解析作用域: "repository:nginx:pull,push"
             parts = scope.split(":")
             if len(parts) == 3:
                 resource_type, resource_name, actions = parts
                 requested_actions = actions.split(",")
                 
-                # Get repository from database
+                # 从数据库获取仓库
                 repo = await Repository.get_or_none(name=resource_name)
                 
                 if repo:
-                    # Check permissions for each action
+                    # 检查每个操作的权限
                     granted_actions = []
                     
                     for action in requested_actions:
@@ -64,7 +64,7 @@ class RegistryAuthService:
                             if has_perm:
                                 granted_actions.append(action)
                     
-                    # Add to access list if any actions granted
+                    # 如果授予了任何操作，则添加到访问列表
                     if granted_actions:
                         access_list.append({
                             "type": resource_type,
@@ -72,8 +72,8 @@ class RegistryAuthService:
                             "actions": granted_actions
                         })
                 else:
-                    # Repository doesn't exist in DB yet
-                    # Allow push for admin users (to create new repos)
+                    # 仓库在数据库中尚不存在
+                    # 允许管理员用户推送(以创建新仓库)
                     if user.is_admin and "push" in requested_actions:
                         access_list.append({
                             "type": resource_type,
@@ -81,7 +81,7 @@ class RegistryAuthService:
                             "actions": ["pull", "push"] if user.is_admin else []
                         })
         
-        # Generate JWT token
+        # 生成JWT令牌
         now = datetime.utcnow()
         expire = now + timedelta(minutes=30)  # Token valid for 30 minutes
         
@@ -95,11 +95,11 @@ class RegistryAuthService:
             "jti": f"{user.id}-{int(now.timestamp())}",  # JWT ID
         }
         
-        # Add access list if any permissions granted
+        # 如果授予了任何权限，则添加访问列表
         if access_list:
             token_data["access"] = access_list
         
-        # Sign token
+        # 签名令牌
         token = jwt.encode(
             token_data,
             settings.SECRET_KEY,
@@ -109,7 +109,7 @@ class RegistryAuthService:
         return token
     
     def parse_scope(self, scope: str) -> dict:
-        """Parse Docker Registry scope string"""
+        """解析Docker Registry作用域字符串"""
         parts = scope.split(":")
         if len(parts) != 3:
             return {}

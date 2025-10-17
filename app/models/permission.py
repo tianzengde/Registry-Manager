@@ -1,17 +1,17 @@
-"""Permission model"""
+"""权限模型"""
 from tortoise import fields
 from tortoise.models import Model
 
 
 class PermissionType(str):
-    """Permission types"""
+    """权限类型"""
     PULL = "pull"
     PUSH = "push"
     DELETE = "delete"
 
 
 class Permission(Model):
-    """Permission model for repository access control"""
+    """用于仓库访问控制的权限模型"""
     
     id = fields.IntField(pk=True)
     user = fields.ForeignKeyField("models.User", related_name="permissions", on_delete=fields.CASCADE)

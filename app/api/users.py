@@ -1,4 +1,4 @@
-"""User management API routes"""
+"""用户管理API路由"""
 from typing import List
 from fastapi import APIRouter, HTTPException, status, Depends
 from app.models import User
@@ -13,20 +13,20 @@ auth_service = AuthService()
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    """Get current user information"""
+    """获取当前用户信息"""
     return current_user
 
 
 @router.get("/", response_model=List[UserResponse])
 async def list_users(current_user: User = Depends(get_current_admin_user)):
-    """List all users (admin only)"""
+    """列出所有用户(仅管理员)"""
     users = await User.all()
     return users
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(user_data: UserCreate, current_user: User = Depends(get_current_admin_user)):
-    """Create a new user (admin only)"""
+    """创建新用户(仅管理员)"""
     existing_user = await User.get_or_none(username=user_data.username)
     if existing_user:
         raise HTTPException(

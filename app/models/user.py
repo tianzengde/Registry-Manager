@@ -1,10 +1,10 @@
-"""User model"""
+"""用户模型"""
 from tortoise import fields
 from tortoise.models import Model
 
 
 class User(Model):
-    """User model for authentication and authorization"""
+    """用于身份验证和授权的用户模型"""
     
     id = fields.IntField(pk=True)
     username = fields.CharField(max_length=50, unique=True, index=True)
@@ -15,7 +15,7 @@ class User(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     
-    # Relationships
+    # 关联关系
     permissions: fields.ReverseRelation["Permission"]
     
     class Meta:

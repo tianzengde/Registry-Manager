@@ -1,4 +1,4 @@
-"""Image management API routes"""
+"""镜像管理API路由"""
 from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from app.models import User, Repository
@@ -14,18 +14,18 @@ permission_service = PermissionService()
 
 @router.post("/cache/clear")
 async def clear_cache(current_user: User = Depends(get_current_admin_user)):
-    """Clear registry service cache (admin only)"""
+    """清除注册表服务缓存(仅管理员)"""
     registry_service.clear_cache()
-    return {"message": "Cache cleared successfully"}
+    return {"message": "缓存清除成功"}
 
 
 @router.get("/catalog", response_model=List[str])
 async def list_catalog(current_user: User = Depends(get_current_user)):
-    """List all available images from registry"""
+    """列出注册表中所有可用的镜像"""
     try:
         repos = await registry_service.list_repositories()
         
-        # Filter repositories based on user permissions
+        # 根据用户权限过滤仓库
         accessible_repos = []
         for repo_name in repos:
             repo = await Repository.get_or_none(name=repo_name)

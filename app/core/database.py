@@ -1,11 +1,11 @@
-"""Database configuration and initialization"""
+"""数据库配置和初始化"""
 import os
 from pathlib import Path
 from tortoise import Tortoise
 from app.core.config import settings
 
 
-# Ensure db directory exists
+# 确保数据库目录存在
 DB_DIR = Path("db")
 DB_DIR.mkdir(exist_ok=True)
 
@@ -23,12 +23,12 @@ TORTOISE_ORM = {
 
 
 async def init_db():
-    """Initialize database connection"""
+    """初始化数据库连接"""
     await Tortoise.init(config=TORTOISE_ORM)
     await Tortoise.generate_schemas()
 
 
 async def close_db():
-    """Close database connection"""
+    """关闭数据库连接"""
     await Tortoise.close_connections()
 

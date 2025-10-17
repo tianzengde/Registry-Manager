@@ -1,4 +1,4 @@
-"""Docker Registry Token Authentication API"""
+"""Docker Registry令牌认证API"""
 from typing import Optional
 from fastapi import APIRouter, HTTPException, status, Request
 from app.services import AuthService, RegistryAuthService
@@ -17,26 +17,26 @@ async def get_registry_token(
     account: Optional[str] = None
 ):
     """
-    Docker Registry Token Authentication endpoint
+    Docker Registry令牌认证端点
     
-    This endpoint is called by Docker client during authentication.
-    Format: GET /token?service=registry&scope=repository:nginx:pull,push
+    此端点在身份验证期间由Docker客户端调用。
+    格式: GET /token?service=registry&scope=repository:nginx:pull,push
     
-    Returns a JWT token with permissions based on user's access rights.
+    返回基于用户访问权限的JWT令牌。
     """
-    # Try to get credentials from Basic Auth header
+    # 尝试从Basic Auth头部获取凭据
     auth_header = request.headers.get("Authorization", "")
     
     user = None
     if auth_header.startswith("Basic "):
-        # Decode Basic Auth
+        # 解码Basic Auth
         import base64
         try:
             encoded_credentials = auth_header.replace("Basic ", "")
             decoded = base64.b64decode(encoded_credentials).decode("utf-8")
             username, password = decoded.split(":", 1)
             
-            # Authenticate user
+            # 验证用户
             user = await auth_service.authenticate_user(username, password)
             
             if not user:
@@ -58,21 +58,21 @@ async def get_registry_token(
                 headers={"WWW-Authenticate": 'Basic realm="Registry Realm"'},
             )
     else:
-        # No credentials provided - this is normal for anonymous access check
-        # Return error to prompt for credentials
+        # 未提供凭据 - 这对于匿名访问检查是正常的
+        # 返回错误以提示输入凭据
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
             headers={"WWW-Authenticate": 'Basic realm="Registry Realm"'},
         )
     
-    # Generate registry token with permissions
+    # 生成带权限的注册表令牌
     token = await registry_auth_service.generate_registry_token(
         user=user,
         scope=scope
     )
     
-    # Return token in Docker Registry expected format
+    # 以Docker Registry期望的格式返回令牌
     return {
         "token": token,
         "access_token": token,  # Some clients expect this field

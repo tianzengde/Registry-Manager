@@ -1,10 +1,10 @@
-"""Repository model"""
+"""仓库模型"""
 from tortoise import fields
 from tortoise.models import Model
 
 
 class Repository(Model):
-    """Repository model for Docker registry repositories"""
+    """Docker registry仓库的仓库模型"""
     
     id = fields.IntField(pk=True)
     name = fields.CharField(max_length=255, unique=True, index=True)
@@ -13,7 +13,7 @@ class Repository(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     
-    # Relationships
+    # 关联关系
     permissions: fields.ReverseRelation["Permission"]
     
     class Meta:

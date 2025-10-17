@@ -1,4 +1,4 @@
-"""Security utilities for authentication and authorization"""
+"""身份验证和授权的安全工具"""
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -10,24 +10,24 @@ from app.core.config import settings
 from app.models import User
 
 
-# HTTP Bearer token
+# HTTP Bearer 令牌
 security = HTTPBearer()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against a hash"""
+    """验证密码与哈希值是否匹配"""
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password"""
+    """对密码进行哈希处理"""
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed.decode('utf-8')
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create a JWT access token"""
+    """创建JWT访问令牌"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -39,7 +39,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def decode_access_token(token: str) -> Optional[dict]:
-    """Decode a JWT access token"""
+    """解码JWT访问令牌"""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
@@ -48,7 +48,7 @@ def decode_access_token(token: str) -> Optional[dict]:
 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
-    """Get the current authenticated user"""
+    """获取当前已认证的用户"""
     token = credentials.credentials
     payload = decode_access_token(token)
     
@@ -85,7 +85,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 
 async def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    """Get the current authenticated admin user"""
+    """获取当前已认证的管理员用户"""
     if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

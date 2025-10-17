@@ -1,4 +1,4 @@
-"""Authentication API routes"""
+"""身份验证API路由"""
 from fastapi import APIRouter, HTTPException, status
 from app.schemas import UserLogin, Token
 from app.services import AuthService
@@ -10,7 +10,7 @@ auth_service = AuthService()
 
 @router.post("/login", response_model=Token)
 async def login(credentials: UserLogin):
-    """Login and get access token"""
+    """登录并获取访问令牌"""
     user = await auth_service.authenticate_user(credentials.username, credentials.password)
     if not user:
         raise HTTPException(

@@ -1,4 +1,4 @@
-"""Permission management API routes"""
+"""权限管理API路由"""
 from typing import List
 from fastapi import APIRouter, HTTPException, status, Depends
 from app.models import User, Repository, Permission
@@ -13,7 +13,7 @@ permission_service = PermissionService()
 
 @router.get("/", response_model=List[PermissionResponse])
 async def list_permissions(current_user: User = Depends(get_current_admin_user)):
-    """List all permissions (admin only)"""
+    """列出所有权限(仅管理员)"""
     permissions = await Permission.all()
     return permissions
 
@@ -23,7 +23,7 @@ async def list_repository_permissions(
     repo_id: int,
     current_user: User = Depends(get_current_admin_user)
 ):
-    """List permissions for a specific repository (admin only)"""
+    """列出特定仓库的权限(仅管理员)"""
     repository = await Repository.get_or_none(id=repo_id)
     if not repository:
         raise HTTPException(

@@ -1,4 +1,4 @@
-"""Repository management API routes"""
+"""仓库管理API路由"""
 from typing import List
 from fastapi import APIRouter, HTTPException, status, Depends
 from app.models import User, Repository
@@ -13,7 +13,7 @@ permission_service = PermissionService()
 
 @router.get("/", response_model=List[RepositoryResponse])
 async def list_repositories(current_user: User = Depends(get_current_user)):
-    """List repositories accessible to current user"""
+    """列出当前用户可访问的仓库"""
     repositories = await permission_service.get_user_repositories(current_user)
     return repositories
 
@@ -23,7 +23,7 @@ async def create_repository(
     repo_data: RepositoryCreate,
     current_user: User = Depends(get_current_admin_user)
 ):
-    """Create a new repository (admin only)"""
+    """创建新仓库(仅管理员)"""
     existing_repo = await Repository.get_or_none(name=repo_data.name)
     if existing_repo:
         raise HTTPException(

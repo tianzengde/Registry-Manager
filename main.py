@@ -1,4 +1,4 @@
-"""Main FastAPI application"""
+"""主FastAPI应用程序"""
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -14,33 +14,33 @@ from app.utils.init_data import initialize_default_data
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager"""
-    # Startup
-    print(">> Starting Docker Registry Manager...")
+    """应用程序生命周期管理器"""
+    # 启动
+    print(">> 正在启动Docker Registry管理器...")
     await init_db()
-    print(">> Database initialized")
+    print(">> 数据库已初始化")
     
     await initialize_default_data()
-    print(">> Default data initialized")
+    print(">> 默认数据已初始化")
     
-    print(f">> Server running on http://{settings.HOST}:{settings.PORT}")
+    print(f">> 服务器运行在 http://{settings.HOST}:{settings.PORT}")
     print(f">> Registry URL: {settings.REGISTRY_URL}")
     
     yield
     
-    # Shutdown
+    # 关闭
     await close_db()
-    print(">> Database connections closed")
+    print(">> 数据库连接已关闭")
 
 
-# Create FastAPI application
+# 创建FastAPI应用程序
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     lifespan=lifespan
 )
 
-# CORS middleware
+# CORS中间件
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -49,19 +49,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
+# 挂载静态文件
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# Include routers
-app.include_router(registry_auth_router)  # Registry token auth at root level
-app.include_router(registry_proxy_router)  # Registry API proxy with permission check
+# 包含路由器
+app.include_router(registry_auth_router)  # 根级别的Registry令牌认证
+app.include_router(registry_proxy_router)  # 带权限检查的Registry API代理
 app.include_router(api_router, prefix="/api")
 app.include_router(page_router)
 
 
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint"""
+    """健康检查端点"""
     return {
         "status": "healthy",
         "app_name": settings.APP_NAME,
