@@ -21,21 +21,29 @@ class PermissionService:
             for k in keys:
                 del self._cache[k]
     
-    async def check_permission(self, user: User, repository: Repository, permission_type: str) -> bool:
+    async def check_permission(self, user: Optional[User], repository: Repository, permission_type: str) -> bool:
         """Check if user has permission for a repository"""
         # Admin users have all permissions
-        if user.is_admin:
+        if user and user.is_admin:
             return True
         
-        # Check cache
+        # Public repositories allow pull for all users (including anonymous)
+        if repository.is_public and permission_type == "pull":
+            return True
+        
+        # For push operations on public repositories, require authentication
+        if repository.is_public and permission_type == "push":
+            # If user is authenticated (not None), allow push
+            return user is not None
+        
+        # Anonymous users can only access public repositories for pull
+        if user is None:
+            return False
+        
+        # Check cache for authenticated users
         cache_key = self._cache_key(user.id, repository.id, permission_type)
         if cache_key in self._cache:
             return self._cache[cache_key]
-        
-        # Public repositories allow pull for all authenticated users
-        if repository.is_public and permission_type == "pull":
-            self._cache[cache_key] = True
-            return True
         
         # Check specific permission
         permission = await Permission.get_or_none(user=user, repository=repository)

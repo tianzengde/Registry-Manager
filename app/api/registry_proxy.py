@@ -194,19 +194,41 @@ async def registry_proxy(request: Request, path: str):
     
     # 从 token 中获取用户
     user = await get_user_from_token(request)
-    if not user:
-        # 根据请求构建动态 realm URL
-        host = request.headers.get("host", "127.0.0.1:3081")
-        scheme = request.headers.get("x-forwarded-proto", "http")
-        realm_url = f"{scheme}://{host}/token"
-        
-        return Response(
-            status_code=401,
-            headers={
-                "WWW-Authenticate": f'Bearer realm="{realm_url}",service="Docker Registry",scope="repository:{repo_name}:pull,push"',
-                "Docker-Distribution-Api-Version": "registry/2.0"
-            }
-        )
+    
+    # 特殊处理 public 仓库的匿名访问
+    if repo_name == "public":
+        # 对于 public 仓库，pull 操作允许匿名访问
+        if action == "pull":
+            # 匿名用户也可以 pull public 仓库
+            pass
+        elif action == "push" and not user:
+            # push 操作需要认证
+            host = request.headers.get("host", "127.0.0.1:3081")
+            scheme = request.headers.get("x-forwarded-proto", "http")
+            realm_url = f"{scheme}://{host}/token"
+            
+            return Response(
+                status_code=401,
+                headers={
+                    "WWW-Authenticate": f'Bearer realm="{realm_url}",service="Docker Registry",scope="repository:{repo_name}:push"',
+                    "Docker-Distribution-Api-Version": "registry/2.0"
+                }
+            )
+    else:
+        # 非 public 仓库需要认证
+        if not user:
+            # 根据请求构建动态 realm URL
+            host = request.headers.get("host", "127.0.0.1:3081")
+            scheme = request.headers.get("x-forwarded-proto", "http")
+            realm_url = f"{scheme}://{host}/token"
+            
+            return Response(
+                status_code=401,
+                headers={
+                    "WWW-Authenticate": f'Bearer realm="{realm_url}",service="Docker Registry",scope="repository:{repo_name}:pull,push"',
+                    "Docker-Distribution-Api-Version": "registry/2.0"
+                }
+            )
     
     # 确定操作类型
     action = determine_action(request.method, full_path)
@@ -229,7 +251,12 @@ async def registry_proxy(request: Request, path: str):
             )
     
     # 检查权限
-    has_permission = await permission_service.check_permission(user, repo, action)
+    # 对于 public 仓库的匿名 pull，直接允许
+    if repo_name == "public" and action == "pull" and user is None:
+        has_permission = True
+    else:
+        has_permission = await permission_service.check_permission(user, repo, action)
+    
     if not has_permission:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
