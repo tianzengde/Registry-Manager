@@ -5,7 +5,10 @@
 {% block content %}
 <div class="page-header">
     <h1>仓库列表</h1>
-    <button onclick="syncFromRegistry()" class="btn btn-primary admin-only">从 Registry 同步</button>
+    <div class="header-actions">
+        <button onclick="showCreateRepoModal()" class="btn btn-primary admin-only">创建仓库</button>
+        <button onclick="syncFromRegistry()" class="btn btn-secondary admin-only">从 Registry 同步</button>
+    </div>
 </div>
 
 <div class="filter-bar">
@@ -26,6 +29,19 @@ let allRepos = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
     await loadRepositories();
+    
+    // 点击模态框外部关闭模态框
+    window.addEventListener('click', (event) => {
+        const createModal = document.getElementById('create-repo-modal');
+        const editModal = document.getElementById('edit-repo-modal');
+        
+        if (event.target === createModal) {
+            hideCreateRepoModal();
+        }
+        if (event.target === editModal) {
+            hideEditRepoModal();
+        }
+    });
 });
 
 async function loadRepositories() {
@@ -57,6 +73,8 @@ function displayRepositories(repos) {
             </div>
             <div class="card-footer">
                 <a href="/repository/${repo.name}" class="btn btn-sm">查看详情</a>
+                <button onclick="editRepository(${repo.id}, '${repo.name}', '${repo.description || ''}', ${repo.is_public})" 
+                        class="btn btn-sm btn-secondary admin-only">编辑</button>
             </div>
         </div>
     `).join('');
@@ -82,6 +100,93 @@ function filterRepositories() {
     }
     
     displayRepositories(filtered);
+}
+
+function showCreateRepoModal() {
+    document.getElementById('create-repo-modal').style.display = 'block';
+    document.getElementById('repo-name').focus();
+}
+
+function editRepository(id, name, description, isPublic) {
+    // 填充编辑表单
+    document.getElementById('edit-repo-id').value = id;
+    document.getElementById('edit-repo-name').value = name;
+    document.getElementById('edit-repo-description').value = description;
+    document.getElementById('edit-is-public').checked = isPublic;
+    
+    // 显示编辑模态框
+    document.getElementById('edit-repo-modal').style.display = 'block';
+    document.getElementById('edit-repo-name').focus();
+}
+
+function hideCreateRepoModal() {
+    document.getElementById('create-repo-modal').style.display = 'none';
+    document.getElementById('create-repo-form').reset();
+}
+
+function hideEditRepoModal() {
+    document.getElementById('edit-repo-modal').style.display = 'none';
+    document.getElementById('edit-repo-form').reset();
+}
+
+async function updateRepository() {
+    const form = document.getElementById('edit-repo-form');
+    const formData = new FormData(form);
+    
+    const repoId = formData.get('id');
+    const repoData = {
+        description: formData.get('description').trim() || null,
+        is_public: formData.get('is_public') === 'on'
+    };
+    
+    try {
+        await apiRequest(`/api/repositories/${repoId}`, {
+            method: 'PUT',
+            body: JSON.stringify(repoData)
+        });
+        
+        alert('仓库更新成功！');
+        hideEditRepoModal();
+        await loadRepositories();
+    } catch (error) {
+        alert('更新失败: ' + error.message);
+    }
+}
+
+async function createRepository() {
+    const form = document.getElementById('create-repo-form');
+    const formData = new FormData(form);
+    
+    const repoData = {
+        name: formData.get('name').trim(),
+        description: formData.get('description').trim() || null,
+        is_public: formData.get('is_public') === 'on'
+    };
+    
+    // 验证仓库名称
+    if (!repoData.name) {
+        alert('请输入仓库名称');
+        return;
+    }
+    
+    // 验证仓库名称格式（只允许字母、数字、连字符、下划线和斜杠）
+    if (!/^[a-zA-Z0-9._/-]+$/.test(repoData.name)) {
+        alert('仓库名称只能包含字母、数字、连字符、下划线、点和斜杠');
+        return;
+    }
+    
+    try {
+        await apiRequest('/api/repositories/', {
+            method: 'POST',
+            body: JSON.stringify(repoData)
+        });
+        
+        alert('仓库创建成功！');
+        hideCreateRepoModal();
+        await loadRepositories();
+    } catch (error) {
+        alert('创建失败: ' + error.message);
+    }
 }
 
 async function syncFromRegistry() {
@@ -136,4 +241,86 @@ async function syncFromRegistry() {
     }
 }
 </script>
+
+<!-- 创建仓库模态框 -->
+<div id="create-repo-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>创建新仓库</h2>
+            <span class="close" onclick="hideCreateRepoModal()">&times;</span>
+        </div>
+        <form id="create-repo-form" onsubmit="event.preventDefault(); createRepository();">
+            <div class="form-group">
+                <label for="repo-name">仓库名称 *</label>
+                <input type="text" id="repo-name" name="name" required 
+                       placeholder="例如: myapp, namespace/app, company/project"
+                       pattern="[a-zA-Z0-9._/-]+"
+                       title="只能包含字母、数字、连字符、下划线、点和斜杠">
+                <small class="form-help">仓库名称将用于 Docker 镜像的完整路径</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="repo-description">描述</label>
+                <textarea id="repo-description" name="description" 
+                          placeholder="可选：描述这个仓库的用途..."
+                          rows="3"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="is-public" name="is_public">
+                    <span class="checkmark"></span>
+                    公开仓库
+                </label>
+                <small class="form-help">公开仓库：任何人都可以拉取，登录用户可以推送</small>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" onclick="hideCreateRepoModal()" class="btn btn-secondary">取消</button>
+                <button type="submit" class="btn btn-primary">创建仓库</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑仓库模态框 -->
+<div id="edit-repo-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>编辑仓库</h2>
+            <span class="close" onclick="hideEditRepoModal()">&times;</span>
+        </div>
+        <form id="edit-repo-form" onsubmit="event.preventDefault(); updateRepository();">
+            <input type="hidden" id="edit-repo-id" name="id">
+            
+            <div class="form-group">
+                <label for="edit-repo-name">仓库名称</label>
+                <input type="text" id="edit-repo-name" name="name" readonly 
+                       style="background-color: #f3f4f6; color: #6b7280;">
+                <small class="form-help">仓库名称不可修改</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit-repo-description">描述</label>
+                <textarea id="edit-repo-description" name="description" 
+                          placeholder="可选：描述这个仓库的用途..."
+                          rows="3"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="edit-is-public" name="is_public">
+                    <span class="checkmark"></span>
+                    公开仓库
+                </label>
+                <small class="form-help">公开仓库：任何人都可以拉取，登录用户可以推送</small>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" onclick="hideEditRepoModal()" class="btn btn-secondary">取消</button>
+                <button type="submit" class="btn btn-primary">保存更改</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
