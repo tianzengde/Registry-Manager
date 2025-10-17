@@ -109,6 +109,15 @@ async def registry_proxy(request: Request, path: str):
     """
     full_path = f"/v2/{path}" if path else "/v2/"
     
+    # 详细输出请求信息
+    print(f"\n{'='*80}")
+    print(f"[PUSH DEBUG] 收到请求: {request.method} {full_path}")
+    print(f"[PUSH DEBUG] 请求头:")
+    for key, value in request.headers.items():
+        print(f"  {key}: {value}")
+    print(f"[PUSH DEBUG] 查询参数: {dict(request.query_params)}")
+    print(f"{'='*80}")
+    
     # 处理 OPTIONS 请求（CORS）
     if request.method == "OPTIONS":
         return Response(status_code=200)
@@ -125,13 +134,24 @@ async def registry_proxy(request: Request, path: str):
             realm_url = f"{scheme}://{host}/token"
             
             # 返回 401 认证挑战
+            response_headers = {
+                "WWW-Authenticate": f'Bearer realm="{realm_url}",service="Docker Registry"',
+                "Docker-Distribution-Api-Version": "registry/2.0"
+            }
+            response_content = b'{"errors":[{"code":"UNAUTHORIZED","message":"authentication required"}]}'
+            
+            print(f"\n{'='*80}")
+            print(f"[PUSH DEBUG] 返回 401 认证挑战")
+            print(f"[PUSH DEBUG] 响应头:")
+            for key, value in response_headers.items():
+                print(f"  {key}: {value}")
+            print(f"[PUSH DEBUG] 响应内容: {response_content}")
+            print(f"{'='*80}\n")
+            
             return Response(
                 status_code=401,
-                headers={
-                    "WWW-Authenticate": f'Bearer realm="{realm_url}",service="Docker Registry"',
-                    "Docker-Distribution-Api-Version": "registry/2.0"
-                },
-                content=b'{"errors":[{"code":"UNAUTHORIZED","message":"authentication required"}]}'
+                headers=response_headers,
+                content=response_content
             )
         # 已认证，返回成功
         return Response(
@@ -261,6 +281,18 @@ async def registry_proxy(request: Request, path: str):
                     location = location.replace(settings.REGISTRY_URL, external_base)
                     headers["location"] = location
                     print(f"[DEBUG] Scheme: {scheme}, Rewritten Location: {location[:100]}...")
+            
+            # 详细输出响应信息
+            print(f"\n{'='*80}")
+            print(f"[PUSH DEBUG] 返回响应: {response.status_code}")
+            print(f"[PUSH DEBUG] 响应头:")
+            for key, value in headers.items():
+                print(f"  {key}: {value}")
+            print(f"[PUSH DEBUG] 响应内容长度: {len(response.content)} bytes")
+            if response.content:
+                content_preview = response.content[:200] if len(response.content) > 200 else response.content
+                print(f"[PUSH DEBUG] 响应内容预览: {content_preview}")
+            print(f"{'='*80}\n")
             
             # 返回响应
             return Response(
