@@ -27,16 +27,16 @@ class PermissionService:
         if user and user.is_admin:
             return True
         
-        # Public repositories allow pull for all users (including anonymous)
+        # 公开仓库允许所有用户（包括匿名用户）拉取
         if repository.is_public and permission_type == "pull":
             return True
         
-        # For push operations on public repositories, require authentication
+        # 对于公开仓库的推送操作，需要身份验证
         if repository.is_public and permission_type == "push":
-            # If user is authenticated (not None), allow push
+            # 如果用户已认证（非None），允许推送
             return user is not None
         
-        # Anonymous users can only access public repositories for pull
+        # 匿名用户只能访问公开仓库进行拉取
         if user is None:
             return False
         
@@ -68,10 +68,10 @@ class PermissionService:
             # Admin can see all repositories
             return await Repository.all()
         
-        # Get public repositories
+        # 获取公开仓库
         public_repos = await Repository.filter(is_public=True).all()
         
-        # Get repositories with explicit permissions
+        # 获取有明确权限的仓库
         permissions = await Permission.filter(user=user).prefetch_related("repository")
         permission_repos = [p.repository for p in permissions]
         

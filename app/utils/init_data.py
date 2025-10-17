@@ -20,7 +20,7 @@ async def initialize_public_repository():
     if not public_repo:
         public_repo = await Repository.create(
             name="public",
-            description="Default public repository - anyone can pull, logged-in users can push",
+            description="默认公开仓库 - 任何人都可以拉取，登录用户可以推送",
             is_public=True
         )
         print(">> Created default public repository: public")
