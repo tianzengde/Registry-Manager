@@ -86,6 +86,7 @@ async function loadRepositoryDetails() {
                 </div>
                 <div class="tag-actions">
                     <button onclick="showImageDetails('${tag}')" class="btn btn-sm btn-primary">查看详情</button>
+                    <button onclick="deleteImageTag('${tag}')" class="btn btn-sm btn-danger admin-only">删除标签</button>
                 </div>
             </div>
         `).join('');
@@ -314,6 +315,25 @@ async function showImageDetails(tag) {
 
 function closeImageModal() {
     document.getElementById('imageModal').style.display = 'none';
+}
+
+async function deleteImageTag(tag) {
+    if (!confirm(`确定要删除镜像标签 "${repoName}:${tag}" 吗？\n\n此操作不可撤销！`)) {
+        return;
+    }
+    
+    try {
+        // URL encode the repository name to handle special characters like /
+        const encodedRepo = encodeURIComponent(repoName).replace(/%2F/g, '/');
+        await apiRequest(`/api/images/${encodedRepo}/${tag}`, { method: 'DELETE' });
+        
+        // 重新加载页面数据
+        await loadRepositoryDetails();
+        alert('镜像标签删除成功');
+    } catch (error) {
+        console.error('Failed to delete image tag:', error);
+        alert('删除失败: ' + error.message);
+    }
 }
 </script>
 {% endblock %}

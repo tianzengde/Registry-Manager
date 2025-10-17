@@ -130,7 +130,7 @@ async function loadUsersAndRepos() {
         const repoSelect = document.getElementById('perm-repo');
         
         userSelect.innerHTML = '<option value="">选择用户...</option>' +
-            allUsers.map(u => `<option value="${u.id}">${u.username}</option>`).join('');
+            allUsers.filter(u => !u.is_admin).map(u => `<option value="${u.id}">${u.username}</option>`).join('');
         
         repoSelect.innerHTML = '<option value="">选择仓库...</option>' +
             allRepos.map(r => `<option value="${r.id}">${r.name}</option>`).join('');

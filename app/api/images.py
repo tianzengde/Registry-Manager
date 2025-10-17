@@ -148,22 +148,36 @@ async def delete_image(
     tag: str,
     current_user: User = Depends(get_current_admin_user)
 ):
-    """Delete an image (admin only)"""
+    """删除镜像(仅管理员)"""
     try:
-        # Get manifest to get digest
-        manifest = await registry_service.get_manifest(repository, tag)
+        # 获取清单以获取摘要
+        manifest, digest = await registry_service.get_manifest(repository, tag)
         
-        # In Registry API v2, we need the digest from the response header
-        # For now, we'll use a workaround
-        # TODO: Implement proper digest retrieval from response headers
+        if not digest:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="无法获取镜像摘要"
+            )
         
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Image deletion requires proper digest handling"
-        )
+        # 删除镜像清单
+        success = await registry_service.delete_manifest(repository, digest)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="删除镜像失败"
+            )
+        
+        # 清除相关缓存
+        registry_service.clear_cache(f"manifest:{repository}:{tag}")
+        registry_service.clear_cache(f"tags:{repository}")
+        registry_service.clear_cache("repositories:list")
+        
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete image: {str(e)}"
+            detail=f"删除镜像失败: {str(e)}"
         )
 
