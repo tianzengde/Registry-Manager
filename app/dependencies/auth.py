@@ -9,8 +9,8 @@ from app.models import User
 from app.services import authenticate_user, get_user_by_username
 
 
+# auto_error=False 由我们手动控制 401 响应，不返回 WWW-Authenticate 头
 basic_security = HTTPBasic(auto_error=False)
-basic_security_required = HTTPBasic(auto_error=True)
 
 
 async def _get_user_from_credentials(
@@ -22,7 +22,6 @@ async def _get_user_from_credentials(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
-            headers={"WWW-Authenticate": "Basic"},
         )
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="用户已被禁用")
@@ -30,23 +29,33 @@ async def _get_user_from_credentials(
 
 
 async def get_current_active_user(
-    credentials: HTTPBasicCredentials = Depends(basic_security_required),
+    credentials: Optional[HTTPBasicCredentials] = Depends(basic_security),
 ) -> User:
     """
     获取当前已认证的用户。
     所有需要认证的 API 端点使用此依赖。
-    自动验证 Basic Auth 凭证。
+    手动验证 Basic Auth 凭证，避免浏览器弹出原生登录框。
     """
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="请提供认证信息",
+        )
     return await _get_user_from_credentials(credentials)
 
 
 async def get_current_admin_user(
-    credentials: HTTPBasicCredentials = Depends(basic_security_required),
+    credentials: Optional[HTTPBasicCredentials] = Depends(basic_security),
 ) -> User:
     """
     获取当前管理员用户。
     仅管理员可访问的端点使用此依赖。
     """
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="请提供认证信息",
+        )
     user = await _get_user_from_credentials(credentials)
     if not user.is_admin:
         raise HTTPException(
