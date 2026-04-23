@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite://db/registry_manager.db"
 
     # Registry connectivity
-    registry_url: str = "http://registry-manager-app:8000"  # proxy through app
+    registry_url: str = "http://docker-registry:5000"  # proxy through app
     registry_username: str | None = None
     registry_password: str | None = None
     registry_verify_ssl: bool = True

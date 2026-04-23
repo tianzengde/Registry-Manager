@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class RepositoryRead(BaseModel):
     name: str
     is_public: bool
+    tags_count: int = 0
 
 
 class RepositoryUpdate(BaseModel):

@@ -1,224 +1,364 @@
 <template>
   <div class="main-layout">
-    <aside class="sidebar" v-if="authStore.isAuthenticated">
+    <!-- 侧边栏 -->
+    <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="brand">
-        <el-icon><Menu /></el-icon>
-        <span>Registry Manager</span>
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+          </svg>
+        </div>
+        <span class="brand-text">Registry</span>
       </div>
-      
-      <el-menu
-        :default-active="$route.name"
-        router
-        class="sidebar-menu"
-      >
-        <el-menu-item index="Repositories" :route="{ name: 'Repositories' }">
-          <el-icon><Folder /></el-icon>
-          <span>仓库管理</span>
-        </el-menu-item>
-        
-        <el-menu-item index="Dashboard" :route="{ name: 'Dashboard' }">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>仪表盘</span>
-        </el-menu-item>
-        
-        <el-menu-item index="Settings" :route="{ name: 'Settings' }">
-          <el-icon><Setting /></el-icon>
-          <span>设置</span>
-        </el-menu-item>
-      </el-menu>
-      
-      <div class="user-info">
-        <el-button v-if="!authStore.isAuthenticated" type="primary" @click="loginVisible = true">
-          登录
-        </el-button>
-        <el-dropdown v-else>
-          <span class="user-name">
-            <el-icon><User /></el-icon>
-            {{ authStore.user?.username }}
-          </span>
-          
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleLogout">
-                <el-icon><SwitchButton /></el-icon>
-                退出登录
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+
+      <nav class="sidebar-nav">
+        <router-link 
+          v-for="item in navItems" 
+          :key="item.route"
+          :to="item.route"
+          class="nav-item"
+          :class="{ active: $route.name === item.route }"
+        >
+          <component :is="item.icon" class="nav-icon" />
+          <span class="nav-text">{{ item.label }}</span>
+        </router-link>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-card" v-if="authStore.user">
+          <div class="user-avatar">
+            {{ authStore.user.username?.charAt(0).toUpperCase() }}
+          </div>
+          <div class="user-info">
+            <div class="user-name">{{ authStore.user.username }}</div>
+            <div class="user-role">{{ authStore.user.is_admin ? '管理员' : '用户' }}</div>
+          </div>
+          <el-dropdown trigger="click">
+            <el-button text class="more-btn">
+              <el-icon><MoreFilled /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="handleLogout">
+                  <el-icon><SwitchButton /></el-icon>
+                  退出登录
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </div>
     </aside>
-    
-    <header class="topbar" v-if="authStore.isAuthenticated">
-      <div class="spacer"></div>
-      <div class="topbar-actions">
-        <el-dropdown v-if="authStore.isAuthenticated">
-          <span class="user-name">
-            <el-icon><User /></el-icon>
-            {{ authStore.user?.username }}
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleLogout">
-                <el-icon><SwitchButton /></el-icon>
-                退出登录
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-      </div>
-    </header>
 
+    <!-- 主内容区 -->
     <main class="main-content">
-      <router-view />
+      <header class="topbar">
+        <div class="page-title">
+          <h1>{{ currentPageTitle }}</h1>
+        </div>
+        <div class="topbar-actions">
+          <el-button text @click="refreshData" :loading="refreshing">
+            <el-icon><Refresh /></el-icon>
+          </el-button>
+        </div>
+      </header>
+      
+      <div class="content-wrapper">
+        <router-view />
+      </div>
     </main>
-
-    <el-dialog v-model="ui.loginVisible" title="登录" width="400px">
-      <el-form :model="loginForm" @submit.prevent="handleLogin">
-        <el-form-item label="用户名">
-          <el-input v-model="loginForm.username" autocomplete="username" />
-        </el-form-item>
-        <el-form-item label="密码">
-          <el-input v-model="loginForm.password" type="password" autocomplete="current-password" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" native-type="submit" :loading="loginLoading">登录</el-button>
-        </el-form-item>
-      </el-form>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useUiStore } from '@/stores/ui'
 import {
-  Menu,
   Folder,
   DataAnalysis,
   Setting,
-  User,
-  SwitchButton
+  Operation,
+  Refresh,
+  SwitchButton,
+  MoreFilled
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
-const ui = useUiStore()
 
-const loginLoading = ref(false)
-const loginForm = ref({ username: '', password: '' })
+const sidebarCollapsed = ref(false)
+const refreshing = ref(false)
+
+const navItems = [
+  { route: 'Repositories', label: '仓库', icon: Folder },
+  { route: 'Dashboard', label: '仪表盘', icon: DataAnalysis },
+  { route: 'Operations', label: '操作日志', icon: Operation },
+  { route: 'Settings', label: '设置', icon: Setting },
+]
+
+const currentPageTitle = computed(() => {
+  const titles = {
+    Repositories: '仓库管理',
+    Dashboard: '仪表盘',
+    Operations: '操作日志',
+    Settings: '设置'
+  }
+  return titles[route.name] || 'Registry Manager'
+})
 
 const handleLogout = () => {
   authStore.logout()
   ElMessage.success('已退出登录')
-  router.push('/main/repos')
+  router.push('/login')
 }
 
-const handleLogin = async () => {
-  loginLoading.value = true
-  try {
-    const result = await authStore.login(loginForm.value)
-    if (result.success) {
-      ElMessage.success('登录成功')
-      ui.hideLogin()
-      router.push('/main/repos')
-    } else {
-      ElMessage.error(result.error)
-    }
-  } catch (e) {
-    ElMessage.error('登录失败')
-  } finally {
-    loginLoading.value = false
+const refreshData = async () => {
+  refreshing.value = true
+  setTimeout(() => {
+    refreshing.value = false
+    ElMessage.success('已刷新')
+  }, 800)
+}
+
+onMounted(async () => {
+  if (!authStore.isAuthenticated) {
+    await authStore.checkAuth()
   }
-}
-
-const openLogin = () => ui.showLogin()
+})
 </script>
 
 <style scoped>
 .main-layout {
   display: flex;
   min-height: 100vh;
-  background-color: var(--el-bg-color-page);
+  background: #f8fafc;
 }
 
+/* 侧边栏 */
 .sidebar {
-  width: 240px;
-  background-color: var(--el-bg-color);
-  border-right: 1px solid var(--el-border-color-light);
+  width: 260px;
+  background: #fff;
+  border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
+  transition: width 0.3s ease;
+}
+
+.sidebar.collapsed {
+  width: 72px;
 }
 
 .brand {
-  padding: 20px 16px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--el-color-primary);
+  padding: 24px 20px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid var(--el-border-color-light);
+  gap: 12px;
 }
 
-.sidebar-menu {
+.brand-icon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.brand-icon svg {
+  width: 20px;
+  height: 20px;
+  color: #fff;
+}
+
+.brand-text {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: -0.5px;
+}
+
+.sidebar.collapsed .brand-text {
+  display: none;
+}
+
+/* 导航 */
+.sidebar-nav {
   flex: 1;
-  border-right: none;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  color: #64748b;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.nav-item:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%);
+  color: #10b981;
+}
+
+.nav-item.active .nav-icon {
+  color: #10b981;
+}
+
+.nav-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.nav-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sidebar.collapsed .nav-text {
+  display: none;
+}
+
+/* 用户卡片 */
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 .user-info {
-  padding: 16px;
-  border-top: 1px solid var(--el-border-color-light);
+  flex: 1;
+  min-width: 0;
 }
 
 .user-name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--el-text-color-regular);
-  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+.user-role {
+  font-size: 12px;
+  color: #10b981;
+}
+
+.sidebar.collapsed .user-info,
+.sidebar.collapsed .more-btn {
+  display: none;
+}
+
+.more-btn {
+  padding: 4px;
+}
+
+/* 主内容区 */
 .main-content {
   flex: 1;
-  padding: 20px;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .topbar {
-  position: sticky;
-  top: 0;
-  height: 56px;
+  height: 72px;
+  padding: 0 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--el-border-color-light);
-  background-color: var(--el-bg-color);
-  z-index: 10;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.topbar .spacer { flex: 1; }
-.topbar-actions { display: flex; align-items: center; gap: 12px; }
+.page-title h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1e293b;
+  letter-spacing: -0.5px;
+}
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-actions .el-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.content-wrapper {
+  flex: 1;
+  padding: 24px 32px;
+  overflow-y: auto;
+}
+
+/* 响应式 */
 @media (max-width: 768px) {
   .sidebar {
-    width: 60px;
+    width: 72px;
   }
   
-  .brand span {
+  .brand-text,
+  .nav-text,
+  .user-info {
     display: none;
   }
   
-  .sidebar-menu span {
-    display: none;
+  .content-wrapper {
+    padding: 16px;
   }
   
-  .user-name span {
-    display: none;
+  .topbar {
+    padding: 0 16px;
+    height: 60px;
+  }
+  
+  .page-title h1 {
+    font-size: 18px;
   }
 }
 </style>

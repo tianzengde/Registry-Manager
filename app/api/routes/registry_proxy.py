@@ -87,7 +87,8 @@ async def registry_proxy(
         pass
 
     # Build upstream request to internal registry service
-    upstream_url = f"http://docker-registry:5000/v2/{full_path}"
+    upstream_base = settings.registry_url.rstrip('/')
+    upstream_url = f"{upstream_base}/v2/{full_path}"
     # Forward headers except Authorization (auth handled here)
     headers = {k: v for k, v in request.headers.items() if k.lower() != "authorization"}
 

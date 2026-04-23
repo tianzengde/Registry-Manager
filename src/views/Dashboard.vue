@@ -1,132 +1,85 @@
 <template>
   <div class="dashboard-page">
-    <div class="page-header">
-      <h1>仪表盘</h1>
-      <el-button type="primary" @click="loadDashboardData" :loading="loading">
-        <el-icon><Refresh /></el-icon>
-        刷新数据
-      </el-button>
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <div class="stat-card" v-for="stat in statsCards" :key="stat.label">
+        <div class="stat-icon" :style="{ background: stat.gradient }">
+          <component :is="stat.icon" />
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stat.value }}</div>
+          <div class="stat-label">{{ stat.label }}</div>
+        </div>
+      </div>
     </div>
 
+    <!-- 内容区 -->
     <div class="dashboard-grid">
-      <!-- 概览卡片 -->
-      <el-card class="overview-card">
-        <template #header>
-          <div class="card-header">
-            <span>系统概览</span>
-          </div>
-        </template>
-        
-        <div v-if="loading" class="loading-container">
-          <el-skeleton :rows="3" animated />
+      <!-- 热门拉取 -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <h3>热门拉取</h3>
+          <el-input-number v-model="topN" :min="1" :max="10" size="small" @change="loadTopPulled" />
         </div>
         
-        <div v-else class="overview-content">
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="总仓库数">
-              {{ overviewData?.total_repositories || 0 }}
-            </el-descriptions-item>
-            <el-descriptions-item label="总标签数">
-              {{ overviewData?.total_tags || 0 }}
-            </el-descriptions-item>
-            <el-descriptions-item label="公开仓库">
-              {{ overviewData?.public_repositories || 0 }}
-            </el-descriptions-item>
-            <el-descriptions-item label="私有仓库">
-              {{ overviewData?.private_repositories || 0 }}
-            </el-descriptions-item>
-            <el-descriptions-item label="存储使用">
-              {{ formatBytes(overviewData?.total_size || 0) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="最后更新">
-              {{ overviewData?.last_updated || '未知' }}
-            </el-descriptions-item>
-          </el-descriptions>
-        </div>
-      </el-card>
-
-      <!-- 拉取Top卡片 -->
-      <el-card class="top-card">
-        <template #header>
-          <div class="card-header">
-            <span>热门拉取排行</span>
-            <el-input-number
-              v-model="topN"
-              :min="1"
-              :max="50"
-              size="small"
-              @change="loadTopPulled"
-            />
-          </div>
-        </template>
-        
-        <div v-if="topLoading" class="loading-container">
-          <el-skeleton :rows="3" animated />
+        <div v-if="topLoading" class="loading-skeleton">
+          <el-skeleton :rows="4" animated />
         </div>
         
         <div v-else-if="topPulled.length === 0" class="empty-state">
-          <el-empty description="暂无拉取数据" />
+          <el-empty description="暂无数据" :image-size="80" />
         </div>
         
         <div v-else class="top-list">
           <div v-for="(item, index) in topPulled" :key="item.name" class="top-item">
-            <div class="rank">#{{ index + 1 }}</div>
-            <div class="repo-info">
-              <div class="repo-name">{{ item.name }}</div>
-              <div class="pull-count">{{ item.pull_count }} 次拉取</div>
-            </div>
+            <div class="rank" :class="index < 3 ? `rank-${index + 1}` : ''">{{ index + 1 }}</div>
+            <div class="repo-name">{{ item.name }}</div>
+            <div class="pull-count">{{ item.pull_count }} 次</div>
           </div>
         </div>
-      </el-card>
+      </div>
 
-      <!-- 趋势分析卡片 -->
-      <el-card class="trends-card">
-        <template #header>
-          <div class="card-header">
-            <span>仓库趋势分析</span>
-            <el-input
-              v-model="trendRepoName"
-              placeholder="输入仓库名称"
-              clearable
-              @change="loadTrends"
-              style="width: 200px"
-            />
-          </div>
-        </template>
+      <!-- 趋势分析 -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <h3>仓库趋势</h3>
+          <el-input
+            v-model="trendRepoName"
+            placeholder="输入仓库名..."
+            clearable
+            size="small"
+            style="width: 180px"
+            @change="loadTrends"
+          />
+        </div>
         
-        <div v-if="trendsLoading" class="loading-container">
+        <div v-if="trendsLoading" class="loading-skeleton">
           <el-skeleton :rows="3" animated />
         </div>
         
         <div v-else-if="!trendData" class="empty-state">
-          <el-empty description="请输入仓库名称查看趋势" />
+          <el-empty description="输入仓库名查看趋势" :image-size="80" />
         </div>
         
-        <div v-else class="trend-content">
-          <el-descriptions :column="1" border>
-            <el-descriptions-item label="仓库名称">
-              {{ trendData.repository }}
-            </el-descriptions-item>
-            <el-descriptions-item label="总拉取次数">
-              {{ trendData.total_pulls || 0 }}
-            </el-descriptions-item>
-            <el-descriptions-item label="最近活跃">
-              {{ trendData.last_activity || '未知' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="标签数量">
-              {{ trendData.tags_count || 0 }}
-            </el-descriptions-item>
-          </el-descriptions>
+        <div v-else class="trend-stats">
+          <div class="trend-stat">
+            <span class="trend-value">{{ trendData.total_pulls }}</span>
+            <span class="trend-label">总拉取</span>
+          </div>
+          <div class="trend-stat">
+            <span class="trend-value">{{ trendData.tags_count }}</span>
+            <span class="trend-label">标签数</span>
+          </div>
         </div>
-      </el-card>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
+import { Box, Timer, Lock, Unlock } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 
 const loading = ref(false)
@@ -138,26 +91,39 @@ const trendsLoading = ref(false)
 const trendData = ref(null)
 const trendRepoName = ref('')
 
-const formatBytes = (bytes) => {
-  if (bytes === 0) return '0 B'
-  
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
+const statsCards = computed(() => [
+  { 
+    label: '总仓库', 
+    value: overviewData.value?.total_repositories || 0, 
+    icon: Box,
+    gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+  },
+  { 
+    label: '总标签', 
+    value: overviewData.value?.total_tags || 0, 
+    icon: Timer,
+    gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+  },
+  { 
+    label: '公开仓库', 
+    value: overviewData.value?.public_repositories || 0, 
+    icon: Unlock,
+    gradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+  },
+  { 
+    label: '私有仓库', 
+    value: overviewData.value?.private_repositories || 0, 
+    icon: Lock,
+    gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
+  },
+])
 
 const loadDashboardData = async () => {
   loading.value = true
   try {
-    await Promise.all([
-      loadOverview(),
-      loadOverviewAggregates(),
-      loadTopPulled()
-    ])
+    await Promise.all([loadOverview(), loadTopPulled()])
   } catch (error) {
-    ElMessage.error('加载仪表盘数据失败')
+    ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
   }
@@ -172,55 +138,32 @@ const loadOverview = async () => {
       total_tags: 0,
       public_repositories: 0,
       private_repositories: 0,
-      total_size: 0,
-      last_updated: new Date().toLocaleString()
     }
   } catch (error) {
-    console.error('加载概览数据失败:', error)
+    console.error('加载概览失败:', error)
   }
-}
 
-const loadOverviewAggregates = async () => {
   try {
     const resp = await api.get('/repositories/')
-    const data = resp.data
-    const repos = Array.isArray(data) ? data : (data?.repositories || [])
-    let publicCount = 0
-    let privateCount = 0
-    let totalTags = 0
-    let totalSize = 0
-    const stats = await Promise.all(repos.map(r => api.get(`/repositories/${encodeURIComponent(r.name)}/stats`).then(s => s.data).catch(() => null)))
-    for (let i = 0; i < repos.length; i++) {
-      const r = repos[i]
-      const isPublic = (r.is_public ?? r.under_public ?? false)
-      if (isPublic) publicCount++
-      else privateCount++
-      const st = stats[i]
-      if (st) {
-        totalTags += st.tag_count || 0
-        totalSize += st.size_bytes || 0
-      }
-    }
+    const repos = Array.isArray(resp.data) ? resp.data : []
     overviewData.value = {
       ...(overviewData.value || {}),
-      total_repositories: overviewData.value?.total_repositories ?? repos.length,
-      public_repositories: publicCount,
-      private_repositories: privateCount,
-      total_tags: totalTags,
-      total_size: totalSize
+      public_repositories: repos.filter(r => r.is_public).length,
+      private_repositories: repos.filter(r => !r.is_public).length,
+      total_tags: repos.reduce((sum, r) => sum + (r.tags_count || 0), 0),
     }
-  } catch (e) {
-  }
+  } catch (e) {}
 }
 
 const loadTopPulled = async () => {
   topLoading.value = true
   try {
     const response = await api.get(`/dashboard/top?n=${topN.value}`)
-    const items = response.data.items || []
-    topPulled.value = items.map(i => ({ name: i.repository, pull_count: i.pulls }))
+    topPulled.value = (response.data.items || []).map(i => ({ 
+      name: i.repository, 
+      pull_count: i.pulls 
+    }))
   } catch (error) {
-    console.error('加载Top数据失败:', error)
     topPulled.value = []
   } finally {
     topLoading.value = false
@@ -237,15 +180,11 @@ const loadTrends = async () => {
   try {
     const response = await api.get(`/dashboard/trends/${encodeURIComponent(trendRepoName.value)}`)
     const data = response.data || {}
-    const sumPulls = (data.last30 || []).reduce((acc, d) => acc + (d.pulls || 0), 0)
     trendData.value = {
-      repository: data.name || trendRepoName.value,
-      total_pulls: sumPulls,
-      last_activity: '未知',
-      tags_count: 0
+      total_pulls: (data.last30 || []).reduce((acc, d) => acc + (d.pulls || 0), 0),
+      tags_count: data.tags_count || 0
     }
-  } catch (error) {
-    console.error('加载趋势数据失败:', error)
+  } catch {
     trendData.value = null
   } finally {
     trendsLoading.value = false
@@ -259,30 +198,87 @@ onMounted(() => {
 
 <style scoped>
 .dashboard-page {
-  padding: 0;
-}
-
-.page-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  flex-direction: column;
+  gap: 24px;
 }
 
+/* 统计卡片 */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.stat-icon .el-icon {
+  font-size: 24px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+/* 仪表盘卡片 */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
+}
+
+.dashboard-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 20px;
 }
 
-.overview-content {
-  padding: 12px 0;
+.card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
 }
 
 .top-list {
@@ -295,36 +291,70 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+.top-item:hover {
+  background: #f1f5f9;
 }
 
 .rank {
-  font-weight: bold;
-  color: var(--el-color-primary);
-  min-width: 30px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 13px;
+  background: #e2e8f0;
+  color: #64748b;
 }
 
-.repo-info {
-  flex: 1;
-}
+.rank-1 { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #fff; }
+.rank-2 { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); color: #fff; }
+.rank-3 { background: linear-gradient(135deg, #d97706 0%, #b45309 100%); color: #fff; }
 
 .repo-name {
+  flex: 1;
+  font-size: 14px;
   font-weight: 500;
-  margin-bottom: 4px;
+  color: #1e293b;
+  font-family: monospace;
 }
 
 .pull-count {
-  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  color: #10b981;
+  font-weight: 500;
+}
+
+.trend-stats {
+  display: flex;
+  gap: 32px;
+}
+
+.trend-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.trend-value {
+  font-size: 36px;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.trend-label {
   font-size: 14px;
+  color: #64748b;
 }
 
-.trend-content {
-  padding: 12px 0;
-}
-
-.loading-container {
+.loading-skeleton {
   padding: 20px 0;
 }
 
@@ -332,15 +362,20 @@ onMounted(() => {
   padding: 40px 0;
 }
 
+/* 响应式 */
+@media (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
-  .dashboard-grid {
+  .stats-grid {
     grid-template-columns: 1fr;
   }
   
-  .page-header {
-    flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
+  .dashboard-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

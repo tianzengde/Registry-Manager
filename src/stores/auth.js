@@ -1,45 +1,43 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import api from '@/utils/api'
+import { ref, computed } from 'vue'
+import api, { AuthManager } from '@/utils/api'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem('authToken'))
   const user = ref(null)
-  const isAuthenticated = ref(!!token.value)
 
+  const isAuthenticated = computed(() => AuthManager.isLoggedIn())
+  const isAdmin = computed(() => user.value?.is_admin === true)
+
+  // 登录：使用 Basic Auth 凭证验证
   const login = async (credentials) => {
     try {
-      const response = await api.post('/auth/login', credentials)
-      const { access_token, user: userData } = response.data
-      
-      token.value = access_token
-      user.value = userData
-      isAuthenticated.value = true
-      
-      localStorage.setItem('authToken', access_token)
-      localStorage.setItem('user', JSON.stringify(userData))
-      
+      // 先设置凭证，然后请求 /auth/me 验证
+      AuthManager.setCredentials(credentials.username, credentials.password)
+
+      const response = await api.get('/auth/me')
+      user.value = response.data
       return { success: true }
     } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.detail || '登录失败' 
+      AuthManager.clearCredentials()
+      user.value = null
+      return {
+        success: false,
+        error: error.response?.data?.detail || '用户名或密码错误'
       }
     }
   }
 
   const logout = () => {
-    token.value = null
+    AuthManager.clearCredentials()
     user.value = null
-    isAuthenticated.value = false
-    
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('user')
   }
 
+  // 检查当前认证状态
   const checkAuth = async () => {
-    if (!token.value) return false
-    
+    if (!AuthManager.isLoggedIn()) {
+      user.value = null
+      return false
+    }
     try {
       const response = await api.get('/auth/me')
       user.value = response.data
@@ -50,12 +48,24 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // 获取用户信息
+  const fetchUser = async () => {
+    try {
+      const response = await api.get('/auth/me')
+      user.value = response.data
+    } catch (error) {
+      user.value = null
+    }
+  }
+
   return {
-    token,
     user,
     isAuthenticated,
+    isAdmin,
     login,
     logout,
-    checkAuth
+    checkAuth,
+    fetchUser,
+    AuthManager
   }
 })

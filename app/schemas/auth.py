@@ -6,29 +6,13 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class Token(BaseModel):
-    access_token: str = Field(..., description="JWT access token")
-    token_type: str = Field(default="bearer")
-
-
-class TokenPayload(BaseModel):
-    sub: str
-    exp: int
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
 class UserRead(BaseModel):
     username: str
     is_admin: bool
-    last_login_at: Optional[datetime]
+    last_login_at: Optional[datetime] = None
     created_at: datetime
 
 
 class PasswordUpdateRequest(BaseModel):
-    current_password: str
-    new_password: str
-
+    current_password: str = Field(..., description="当前密码")
+    new_password: str = Field(..., min_length=6, description="新密码（至少6位）")

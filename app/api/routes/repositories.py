@@ -22,6 +22,14 @@ async def list_repositories(user: User | None = Depends(get_optional_user)) -> l
     repo_names = await client.list_repositories()
     existing = {r.name: r async for r in Repository.all()}
 
+    # 统计每个仓库的标签数
+    tags_count_map: dict[str, int] = {}
+    for name in repo_names:
+        try:
+            tags_count_map[name] = len(await client.list_tags(name))
+        except RegistryNotFoundError:
+            tags_count_map[name] = 0
+
     result: list[RepositoryRead] = []
     for name in repo_names:
         repo = existing.get(name)
@@ -39,7 +47,7 @@ async def list_repositories(user: User | None = Depends(get_optional_user)) -> l
             is_public = repo.is_public
         if user is None and not is_public:
             continue
-        result.append(RepositoryRead(name=name, is_public=is_public))
+        result.append(RepositoryRead(name=name, is_public=is_public, tags_count=tags_count_map.get(name, 0)))
     return sorted(result, key=lambda r: r.name)
 
 

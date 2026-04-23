@@ -1,4 +1,1 @@
-from . import health, auth
-
-__all__ = ["health", "auth"]
-
+# Route module aggregation - individual routes are imported in app/api/__init__.py
