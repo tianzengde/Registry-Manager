@@ -12,7 +12,7 @@ load_dotenv()
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    model_config = SettingsConfigDict(env_file=None, extra="ignore")
+    model_config = SettingsConfigDict(extra="ignore")
 
     project_name: str = "Registry Manager"
     debug: bool = False

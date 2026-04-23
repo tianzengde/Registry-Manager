@@ -15,7 +15,7 @@
         <router-link 
           v-for="item in navItems" 
           :key="item.route"
-          :to="item.route"
+          :to="{ name: item.route }"
           class="nav-item"
           :class="{ active: $route.name === item.route }"
         >

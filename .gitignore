@@ -14,3 +14,5 @@ wheels/
 .env
 media
 volumes
+
+node_modules/

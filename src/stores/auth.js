@@ -8,21 +8,37 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => AuthManager.isLoggedIn())
   const isAdmin = computed(() => user.value?.is_admin === true)
 
-  // 登录：使用 Basic Auth 凭证验证
+  // 登录：使用 fetch 发送 Basic Auth 请求，避免触发浏览器弹窗
+  // 原因：axios 请求收到 401 + WWW-Authenticate 头时，浏览器会弹原生认证框
   const login = async (credentials) => {
     try {
-      // 先设置凭证，然后请求 /auth/me 验证
-      AuthManager.setCredentials(credentials.username, credentials.password)
+      const token = btoa(`${credentials.username}:${credentials.password}`)
+      const response = await fetch('/api/auth/me', {
+        headers: {
+          Authorization: `Basic ${token}`
+        }
+      })
 
-      const response = await api.get('/auth/me')
-      user.value = response.data
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        AuthManager.clearCredentials()
+        user.value = null
+        return {
+          success: false,
+          error: err.detail || `登录失败 (${response.status})`
+        }
+      }
+
+      const userData = await response.json()
+      AuthManager.setCredentials(credentials.username, credentials.password)
+      user.value = userData
       return { success: true }
     } catch (error) {
       AuthManager.clearCredentials()
       user.value = null
       return {
         success: false,
-        error: error.response?.data?.detail || '用户名或密码错误'
+        error: error.message || '网络错误'
       }
     }
   }

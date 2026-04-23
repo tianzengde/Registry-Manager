@@ -162,8 +162,8 @@ const pagedOperations = computed(() => {
 const loadOperations = async () => {
   loading.value = true
   try {
-    const resp = await api.get('/operations/')
-    operations.value = Array.isArray(resp.data) ? resp.data : []
+    const resp = await api.get('/logs/operations')
+    operations.value = resp.data?.items ?? []
   } catch {
     ElMessage.error('加载操作记录失败')
   } finally {
