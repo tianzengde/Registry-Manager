@@ -25,11 +25,11 @@ services:
       - "8000"
       - --reload
     environment:
-      SECRET_KEY: ${SECRET_KEY:-change-this-secret-key}
-      DEBUG: ${DEBUG:-true}
-      DATABASE_URL: ${DATABASE_URL:-sqlite://db/registry_manager.db}
-      REGISTRY_URL: ${REGISTRY_URL:-http://docker-registry:5000}
-      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-admin}
+      SECRET_KEY: a1b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef
+      DEBUG: True
+      DATABASE_URL: sqlite://db/registry_manager.db
+      REGISTRY_URL: http://docker-registry:5000
+      ADMIN_INITIAL_PASSWORD: admin@admin
     ports:
       - "30080:8000"
     volumes:
