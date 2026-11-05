@@ -16,6 +16,7 @@ export function db() {
     CREATE TABLE IF NOT EXISTS operation_logs (id INTEGER PRIMARY KEY, actor TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL, detail TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS pull_push_events (id INTEGER PRIMARY KEY, repository TEXT NOT NULL, tag TEXT, action TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS repo_daily_stats (id INTEGER PRIMARY KEY, repository TEXT NOT NULL, day TEXT NOT NULL, pulls INTEGER NOT NULL DEFAULT 0, pushes INTEGER NOT NULL DEFAULT 0, last_activity_at TEXT, UNIQUE(repository, day));
+    CREATE TABLE IF NOT EXISTS tag_push_metadata (repository TEXT NOT NULL, tag TEXT NOT NULL, digest TEXT NOT NULL, pushed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(repository,tag));
     CREATE TABLE IF NOT EXISTS web_sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, expires_at INTEGER NOT NULL);
   `);
   if (!instance.prepare("SELECT id FROM users LIMIT 1").get()) {

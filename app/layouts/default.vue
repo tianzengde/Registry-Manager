@@ -26,6 +26,9 @@ const {
   detailError,
   activeTab,
   drawerSearch,
+  selectedTag,
+  platformIndex,
+  platformInfo,
   showConnect,
   showDelete,
   deleting,
@@ -209,21 +212,24 @@ const {
                 aria-label="搜索镜像标签"
               />
             </div>
-            <div class="tag-list">
-              <button
-                v-for="tag in tags"
-                :key="tag"
-                :class="{ active: detail?.reference === tag }"
-                @click="loadDetail(tag)"
+            <label class="tag-selector">
+              <span>镜像标签（倒序）</span>
+              <select
+                :value="selectedTag"
+                aria-label="选择镜像标签"
+                @change="loadDetail(($event.target as HTMLSelectElement).value)"
               >
-                <AppIcon name="Tag" :size="14" />{{ tag
-                }}<AppIcon
-                  v-if="detail?.reference === tag"
-                  name="Check"
-                  :size="14"
-                />
-              </button>
-            </div>
+                <option
+                  v-if="selectedTag && !tags.includes(selectedTag)"
+                  :value="selectedTag"
+                >
+                  {{ selectedTag }}（当前标签）
+                </option>
+                <option v-for="tag in tags" :key="tag" :value="tag">
+                  {{ tag }}
+                </option>
+              </select>
+            </label>
             <p v-if="!tags.length" class="muted">
               {{
                 selected.error
@@ -258,18 +264,22 @@ const {
                     </dd>
                   </div>
                   <div>
-                    <dt>压缩层大小</dt>
+                    <dt>镜像大小（所选架构压缩层）</dt>
                     <dd>
-                      {{
-                        detail.platforms?.length
-                          ? "多架构索引"
-                          : size(detail.size_bytes)
-                      }}
+                      {{ size(platformInfo?.size_bytes) }}
                     </dd>
                   </div>
                   <div>
                     <dt>构建时间</dt>
-                    <dd>{{ date(detail.created_at) }}</dd>
+                    <dd>{{ date(platformInfo?.created_at) }}</dd>
+                  </div>
+                  <div>
+                    <dt>标签推送时间（代理记录）</dt>
+                    <dd>
+                      {{
+                        detail.pushed_at ? date(detail.pushed_at) : "暂无记录"
+                      }}
+                    </dd>
                   </div>
                   <div>
                     <dt>Digest</dt>
@@ -278,15 +288,22 @@ const {
                     </dd>
                   </div>
                 </dl>
-                <div v-if="detail.platforms?.length" class="platforms">
-                  <span
-                    v-for="(platform, i) in detail.platforms"
-                    :key="i"
-                    class="badge"
-                    >{{ platform.os }}/{{ platform.architecture
-                    }}{{ platform.variant ? `/${platform.variant}` : "" }}</span
-                  >
-                </div>
+                <label v-if="detail.platforms?.length" class="tag-selector">
+                  <span>镜像架构</span>
+                  <select v-model="platformIndex" aria-label="选择镜像架构">
+                    <option
+                      v-for="(platform, i) in detail.platforms"
+                      :key="i"
+                      :value="String(i)"
+                    >
+                      {{ platform.os }}/{{ platform.architecture
+                      }}{{ platform.variant ? `/${platform.variant}` : "" }}
+                    </option>
+                  </select>
+                </label>
+                <p v-if="platformInfo?.error" class="muted">
+                  此架构的详细信息暂时读取失败，请重新选择标签重试。
+                </p>
                 <h4 class="command-label">拉取镜像</h4>
                 <div class="code-block">
                   <code>{{ pullCommand }}</code

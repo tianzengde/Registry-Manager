@@ -57,6 +57,12 @@ export function createWorkspace() {
     detailError = ref(""),
     activeTab = ref("tags"),
     drawerSearch = ref("");
+  const selectedTag = ref(""),
+    platformIndex = ref("0");
+  const platformInfo = computed(
+    () =>
+      detail.value?.platforms?.[Number(platformIndex.value)] || detail.value,
+  );
   const showConnect = ref(false),
     showDelete = ref(false),
     deleting = ref(false),
@@ -101,9 +107,12 @@ export function createWorkspace() {
         .replace(/\/$/, "") || (import.meta.client ? location.host : ""),
   );
   const tags = computed(() =>
-    (selected.value?.tags || []).filter((t: string) =>
-      t.includes(drawerSearch.value),
-    ),
+    (selected.value?.tags || [])
+      .filter((t: string) => t.includes(drawerSearch.value))
+      .slice()
+      .sort((a: string, b: string) =>
+        b.localeCompare(a, "en", { numeric: true }),
+      ),
   );
   const pullCommand = computed(
     () =>
@@ -114,7 +123,7 @@ export function createWorkspace() {
       [...name].reduce((n, c) => n + c.charCodeAt(0), 0) % 4
     ];
   function size(n: number) {
-    return n ? `${(n / 1024 / 1024).toFixed(1)} MB` : "—";
+    return n == null ? "暂无数据" : `${(n / 1024 / 1024).toFixed(1)} MB`;
   }
   function date(value: string) {
     return value
@@ -144,10 +153,13 @@ export function createWorkspace() {
     detailError.value = "";
     activeTab.value = "tags";
     drawerSearch.value = "";
-    if (repo.tags?.length) await loadDetail(repo.tags[0]);
+    selectedTag.value = "";
+    if (tags.value.length) await loadDetail(tags.value[0]);
   }
   let detailRequest = 0;
   async function loadDetail(tag: string) {
+    selectedTag.value = tag;
+    platformIndex.value = "0";
     const request = ++detailRequest;
     const repo = selected.value?.name;
     detailLoading.value = true;
@@ -332,6 +344,9 @@ export function createWorkspace() {
     detailError,
     activeTab,
     drawerSearch,
+    selectedTag,
+    platformIndex,
+    platformInfo,
     showConnect,
     showDelete,
     deleting,

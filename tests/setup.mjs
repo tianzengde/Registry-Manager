@@ -92,7 +92,7 @@ export async function setup() {
       NUXT_REGISTRY_PASSWORD: "",
     });
     await waitFor(`http://127.0.0.1:${appPort}/api/health`, app);
-    return { base: `http://127.0.0.1:${appPort}`, password, stop };
+    return { base: `http://127.0.0.1:${appPort}`, password, database, stop };
   } catch (error) {
     await stop();
     throw error;

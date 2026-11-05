@@ -1263,3 +1263,20 @@ label {
     font-size: 13px;
   }
 }
+
+.tag-selector {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  min-width: 0;
+}
+.tag-selector > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.tag-selector select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 12px;
+  text-overflow: ellipsis;
+}

@@ -79,42 +79,84 @@ export function repoPath(name: string) {
     throw createError({ statusCode: 400, statusMessage: "仓库名称无效" });
   return name.split("/").map(encodeURIComponent).join("/");
 }
+// Registry 不提供标签推送时间，仅使用代理成功接收且摘要一致的推送记录。
 export async function metadata(name: string, ref: string) {
-  const response = await registryRequest(
-    `${repoPath(name)}/manifests/${encodeURIComponent(ref)}`,
-  );
-  const manifest = await response.json();
-  let config: any = {};
-  if (manifest.config?.digest)
-    config = await (
+  async function readManifest(reference: string) {
+    const response = await registryRequest(
+      `${repoPath(name)}/manifests/${encodeURIComponent(reference)}`,
+    );
+    return {
+      manifest: await response.json(),
+      digest: response.headers.get("docker-content-digest") || "",
+    };
+  }
+  async function imageInfo(manifest: any) {
+    if (!manifest.config?.digest) return { size_bytes: null, created_at: null };
+    const config = await (
       await registryRequest(
         `${repoPath(name)}/blobs/${encodeURIComponent(manifest.config.digest)}`,
       )
     ).json();
+    return {
+      size_bytes: (manifest.layers || []).reduce(
+        (n: number, l: any) => n + (l.size || 0),
+        0,
+      ),
+      created_at: config.created || null,
+      os: config.os,
+      architecture: config.architecture,
+      variant: config.variant,
+    };
+  }
+  const { manifest, digest } = await readManifest(ref);
+  const info = await imageInfo(manifest);
+  const platforms: any[] = [];
+  const descriptors = (manifest.manifests || []).filter(
+    (m: any) =>
+      m.platform?.os &&
+      m.platform.os !== "unknown" &&
+      m.platform?.architecture &&
+      m.platform.architecture !== "unknown",
+  );
+  for (let i = 0; i < descriptors.length; i += 4) {
+    platforms.push(
+      ...(await Promise.all(
+        descriptors.slice(i, i + 4).map(async (m: any) => {
+          try {
+            const child = await readManifest(m.digest);
+            return {
+              ...(await imageInfo(child.manifest)),
+              ...m.platform,
+              digest: m.digest,
+            };
+          } catch {
+            return {
+              ...m.platform,
+              digest: m.digest,
+              size_bytes: null,
+              created_at: null,
+              error: true,
+            };
+          }
+        }),
+      )),
+    );
+  }
+  if (!descriptors.length && info.os && info.architecture)
+    platforms.push({ ...info, digest });
+  const pushed = db()
+    .prepare(
+      "SELECT pushed_at FROM tag_push_metadata WHERE repository=? AND tag=? AND digest=?",
+    )
+    .get(name, ref, digest) as any;
   return {
     repository: name,
     reference: ref,
-    digest: response.headers.get("docker-content-digest") || "",
+    digest,
     media_type: manifest.mediaType,
-    size_bytes: (manifest.layers || []).reduce(
-      (n: number, l: any) => n + (l.size || 0),
-      0,
-    ),
-    architecture: config.architecture,
-    os: config.os,
-    created_at: config.created,
-    platforms: (manifest.manifests || [])
-      .filter(
-        (m: any) =>
-          m.platform?.os &&
-          m.platform.os !== "unknown" &&
-          m.platform?.architecture &&
-          m.platform.architecture !== "unknown",
-      )
-      .map((m: any) => ({
-        ...m.platform,
-        digest: m.digest,
-      })),
+    ...info,
+    pushed_at: pushed?.pushed_at || null,
+    platforms,
     manifest,
   };
 }

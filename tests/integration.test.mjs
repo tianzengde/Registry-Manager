@@ -1,4 +1,5 @@
 import { test, before, after } from "node:test";
+import { DatabaseSync } from "node:sqlite";
 import { setup } from "./setup.mjs";
 import assert from "node:assert/strict";
 let base, password, fixture;
@@ -93,6 +94,9 @@ test("Nuxt API, authentication, nested repositories, OCI, proxy and deletion", a
     await request("/api/repositories/acme/api/manifests/latest")
   ).json();
   assert.equal(manifest.architecture, "arm64");
+  assert.equal(manifest.platforms.length, 1);
+  assert.equal(manifest.platforms[0].architecture, "arm64");
+  assert.equal(manifest.pushed_at, null);
   const head = await request("/v2/acme/api/manifests/latest", {
     method: "HEAD",
   });
@@ -105,6 +109,38 @@ test("Nuxt API, authentication, nested repositories, OCI, proxy and deletion", a
     await request("/api/repositories/public/alpine/manifests/latest")
   ).json();
   assert.equal(index.platforms.length, 2);
+  assert.equal(index.platforms[0].size_bytes, 28672000);
+  assert.equal(index.platforms[0].created_at, "2026-11-01T08:30:00Z");
+  assert.equal(
+    (
+      await request("/v2/acme/api/manifests/latest", {
+        method: "PUT",
+        headers: { Authorization: basic("admin") },
+        body: "{}",
+      })
+    ).status,
+    200,
+  );
+  const pushed = await (
+    await request("/api/repositories/acme/api/manifests/latest")
+  ).json();
+  assert.ok(pushed.pushed_at);
+  // 标签摘要变化后，不能将旧镜像的推送时间显示给新镜像。
+  const testDb = new DatabaseSync(fixture.database);
+  testDb
+    .prepare(
+      "UPDATE tag_push_metadata SET digest=? WHERE repository=? AND tag=?",
+    )
+    .run("sha256:" + "f".repeat(64), "acme/api", "latest");
+  testDb.close();
+  const changed = await (
+    await request("/api/repositories/acme/api/manifests/latest")
+  ).json();
+  assert.equal(changed.pushed_at, null);
+  const otherTag = await (
+    await request("/api/repositories/acme/api/manifests/v1.4.0")
+  ).json();
+  assert.equal(otherTag.pushed_at, null);
   const ociAccept =
     "application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json";
   const oci = await request("/v2/public/alpine/manifests/oci-required", {

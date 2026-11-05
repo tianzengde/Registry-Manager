@@ -103,14 +103,20 @@ const server = createServer(async (req, res) => {
       );
       return res.end();
     }
-    if (path.includes("public/alpine"))
+    if (path.includes("public/alpine") && !path.includes("/manifests/sha256:"))
       return json({
         schemaVersion: 2,
         mediaType: "application/vnd.oci.image.index.v1+json",
         manifests: [
           { digest, platform: { os: "linux", architecture: "arm64" } },
           { digest, platform: { os: "linux", architecture: "amd64" } },
-          {digest,platform:{os:"unknown",architecture:"unknown"},annotations:{"vnd.docker.reference.type":"attestation-manifest"}},
+          {
+            digest,
+            platform: { os: "unknown", architecture: "unknown" },
+            annotations: {
+              "vnd.docker.reference.type": "attestation-manifest",
+            },
+          },
         ],
       });
     return json(single);

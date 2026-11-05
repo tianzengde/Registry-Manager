@@ -81,6 +81,17 @@ export default defineEventHandler(async (event) => {
     const manifest = path.match(/^(.+)\/manifests\/([^/]+)$/);
     if (response.ok && manifest && ["GET", "PUT"].includes(event.method)) {
       const action = event.method === "GET" ? "pull" : "push";
+      if (action === "push" && response.headers.get("docker-content-digest")) {
+        db()
+          .prepare(
+            "INSERT INTO tag_push_metadata (repository,tag,digest) VALUES (?,?,?) ON CONFLICT(repository,tag) DO UPDATE SET digest=excluded.digest,pushed_at=CURRENT_TIMESTAMP",
+          )
+          .run(
+            manifest[1]!,
+            manifest[2]!,
+            response.headers.get("docker-content-digest")!,
+          );
+      }
       const day = new Date().toISOString().slice(0, 10);
       db()
         .prepare(
