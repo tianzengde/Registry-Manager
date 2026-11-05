@@ -1,5 +1,8 @@
 # 首次启动前，请在 .env 中设置 ADMIN_INITIAL_PASSWORD。
 # 已有绑定挂载的数据库需先迁入 db-data 命名卷，再切换存储配置。
+# 已有部署请保留原数据目录，并使用 -p 参数沿用原 Compose 项目名。
+name: registry-manager
+
 services:
   registry:
     image: registry:3.0.0
@@ -17,7 +20,7 @@ services:
     environment:
       NUXT_REGISTRY_URL: http://registry:5000
       NUXT_DATABASE_PATH: /app/db/registry_manager.db
-      NUXT_ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?Set ADMIN_INITIAL_PASSWORD in .env}
+      NUXT_ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?请在 .env 中设置管理员初始密码}
       NUXT_ALLOW_TAG_DELETE: ${ALLOW_TAG_DELETE:-false}
       NUXT_COOKIE_SECURE: ${COOKIE_SECURE:-false}
       NUXT_REGISTRY_PUBLIC_URL: ${REGISTRY_PUBLIC_URL:-localhost:30080}

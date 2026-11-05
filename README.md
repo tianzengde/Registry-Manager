@@ -24,3 +24,16 @@
 ```sh
 docker pull ghcr.io/tianzengde/registry-manager:latest
 ```
+
+## 部署
+
+无需克隆源码。将部署文件下载到同一个空目录，设置管理员密码后即可启动：
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/tianzengde/Registry-Manager/main/deploy/docker-compose.yaml
+curl -fsSL https://raw.githubusercontent.com/tianzengde/Registry-Manager/main/deploy/.env.example -o .env
+# 修改 .env 中的管理员密码和对外访问地址
+docker compose up -d
+```
+
+默认访问端口为 `30080`，登录用户名为 `admin`。数据库使用 Docker 命名卷，镜像存储在部署目录的 `data/registry` 中；更新时保留这些数据。
