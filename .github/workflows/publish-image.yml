@@ -45,15 +45,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          IMAGE="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          VERSION=$(node -p "JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version")
           echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          # 正式标签必须与项目版本一致，避免发布错版。
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            if [[ ! "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || [[ "$GITHUB_REF_NAME" != "v${VERSION}" ]]; then
+              echo "正式标签必须为 v主版本.次版本.修订版本，且与 package.json 版本一致。" >&2
+              exit 1
+            fi
+          fi
           {
             echo 'tags<<EOF'
             echo "${IMAGE}:sha-${GITHUB_SHA}"
             if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-              echo "${IMAGE}:${GITHUB_REF_NAME}"
-            elif [[ "$GITHUB_REF" == refs/heads/main ]]; then
+              echo "${IMAGE}:${VERSION}"
               echo "${IMAGE}:latest"
+            elif [[ "$GITHUB_REF" == refs/heads/main ]]; then
+              echo "${IMAGE}:edge"
             fi
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
@@ -82,6 +92,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.tags.outputs.version }}
       - name: Verify published platforms
         shell: bash
         run: |
