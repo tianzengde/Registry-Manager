@@ -4,15 +4,19 @@
 name: registry-manager
 
 services:
+  # 官方 Registry 后端，负责镜像存储及推拉协议。
   registry:
     image: registry:3.0.0
+    container_name: registry
     restart: unless-stopped
     environment:
       REGISTRY_STORAGE_DELETE_ENABLED: "true"
     expose:
       - "5000"
     volumes:
+      # Registry 标准存储根目录；已有 v2 数据应位于 data/registry/docker/registry/v2。
       - ./data/registry:/var/lib/registry
+  # 管理界面及认证代理，通过服务名 registry 连接上述后端。
   app:
     image: ghcr.io/tianzengde/registry-manager:latest
     init: true
