@@ -27,12 +27,11 @@ docker pull ghcr.io/tianzengde/registry-manager:latest
 
 ## 部署
 
-无需克隆源码。将部署文件下载到同一个空目录，设置管理员密码后即可启动：
+无需克隆源码或准备 `.env` 文件。只需下载一个 Compose 文件，修改管理员密码后启动：
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/tianzengde/Registry-Manager/main/deploy/docker-compose.yaml
-curl -fsSL https://raw.githubusercontent.com/tianzengde/Registry-Manager/main/deploy/.env.example -o .env
-# 修改 .env 中的管理员密码和对外访问地址
+# 修改 docker-compose.yaml 中的 NUXT_ADMIN_INITIAL_PASSWORD
 docker compose up -d
 ```
 

@@ -1,5 +1,5 @@
 # 仅供开发者使用，从项目根目录执行：
-# docker compose --env-file deploy/.env -f deploy/docker-compose.yaml -f dev/docker-compose.build.yaml up -d --build
+# docker compose -f deploy/docker-compose.yaml -f dev/docker-compose.build.yaml up -d --build
 services:
   app:
     image: registry-manager:local

@@ -1,4 +1,4 @@
-# 首次启动前，请在 .env 中设置 ADMIN_INITIAL_PASSWORD。
+# 下载本文件后，修改下方 NUXT_ADMIN_INITIAL_PASSWORD 即可启动。
 # 已有绑定挂载的数据库需先迁入 db-data 命名卷，再切换存储配置。
 # 已有部署请保留原数据目录，并使用 -p 参数沿用原 Compose 项目名。
 name: registry-manager
@@ -14,18 +14,24 @@ services:
     volumes:
       - ./data/registry:/var/lib/registry
   app:
-    image: ${REGISTRY_MANAGER_IMAGE:-ghcr.io/tianzengde/registry-manager:latest}
+    image: ghcr.io/tianzengde/registry-manager:latest
     init: true
     restart: unless-stopped
     environment:
       NUXT_REGISTRY_URL: http://registry:5000
       NUXT_DATABASE_PATH: /app/db/registry_manager.db
-      NUXT_ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?请在 .env 中设置管理员初始密码}
-      NUXT_ALLOW_TAG_DELETE: ${ALLOW_TAG_DELETE:-false}
-      NUXT_COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      NUXT_REGISTRY_PUBLIC_URL: ${REGISTRY_PUBLIC_URL:-localhost:30080}
+      # 首次创建管理员时使用；已有账号不会被重置。
+      # 请修改此密码；如果包含 $，需写成 $$，避免 Compose 将其作为变量解析。
+      NUXT_ADMIN_INITIAL_PASSWORD: 'change-this-password'
+      # 是否允许删除镜像。
+      NUXT_ALLOW_TAG_DELETE: "false"
+      # 使用 HTTPS 对外提供服务时，改为 "true"。
+      NUXT_COOKIE_SECURE: "false"
+      # 留空时根据访问地址生成镜像推拉命令，也可以填写自定义域名和端口。
+      NUXT_REGISTRY_PUBLIC_URL: ""
     ports:
-      - "${REGISTRY_MANAGER_PORT:-30080}:8000"
+      # 左侧为宿主机端口，可按需修改。
+      - "30080:8000"
     volumes:
       - db-data:/app/db
     depends_on:
