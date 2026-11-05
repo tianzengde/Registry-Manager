@@ -1,0 +1,16 @@
+node_modules
+.nuxt
+.output
+.git
+.env
+.env.*
+runtime.env
+compose.env
+.venv
+data
+db
+.DS_Store
+docs
+
+**/__pycache__
+*.pyc

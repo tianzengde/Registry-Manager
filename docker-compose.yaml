@@ -1,40 +1,32 @@
+# 首次启动前，请在 .env 中设置 ADMIN_INITIAL_PASSWORD。
+# 已有绑定挂载的数据库需先迁入 db-data 命名卷，再切换存储配置。
 services:
   registry:
     image: registry:3.0.0
-    container_name: docker-registry
     restart: unless-stopped
     environment:
       REGISTRY_STORAGE_DELETE_ENABLED: "true"
     expose:
       - "5000"
-    ports:
-      - "5000:5000"
     volumes:
       - ./data/registry:/var/lib/registry
-
   app:
-    build:
-      context: .
-    container_name: registry-manager-app
-    command:
-      - uv
-      - run
-      - uvicorn
-      - app.main:app
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
-      - --reload
+    image: ${REGISTRY_MANAGER_IMAGE:-ghcr.io/tianzengde/registry-manager:latest}
+    init: true
+    restart: unless-stopped
     environment:
-      SECRET_KEY: a1b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef
-      DEBUG: True
-      DATABASE_URL: sqlite://db/registry_manager.db
-      REGISTRY_URL: http://docker-registry:5000
-      ADMIN_INITIAL_PASSWORD: admin@admin
+      NUXT_REGISTRY_URL: http://registry:5000
+      NUXT_DATABASE_PATH: /app/db/registry_manager.db
+      NUXT_ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?Set ADMIN_INITIAL_PASSWORD in .env}
+      NUXT_ALLOW_TAG_DELETE: ${ALLOW_TAG_DELETE:-false}
+      NUXT_COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      NUXT_REGISTRY_PUBLIC_URL: ${REGISTRY_PUBLIC_URL:-localhost:30080}
     ports:
-      - "30080:8000"
+      - "${REGISTRY_MANAGER_PORT:-30080}:8000"
     volumes:
-      - ./data/db:/app/db
+      - db-data:/app/db
     depends_on:
       - registry
+
+volumes:
+  db-data:

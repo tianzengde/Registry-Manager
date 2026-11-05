@@ -1,0 +1,8 @@
+# 从本地源码构建并启动：
+# docker compose -f docker-compose.yaml -f docker-compose.build.yaml up -d --build
+services:
+  app:
+    image: registry-manager:local
+    pull_policy: build
+    build:
+      context: .

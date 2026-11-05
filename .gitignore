@@ -12,7 +12,16 @@ wheels/
 # Virtual environments
 .venv
 .env
+.env.*
+!.env.example
+runtime.env
+compose.env
+.DS_Store
 media
 volumes
 
 node_modules/
+.nuxt/
+.output/
+.playwright/
+*.log

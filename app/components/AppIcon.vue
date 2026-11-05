@@ -1,0 +1,79 @@
+<script setup lang="ts">
+import {
+  Boxes,
+  Box,
+  LayoutDashboard,
+  Search,
+  ArrowUpRight,
+  ArrowRight,
+  ChevronRight,
+  ChevronDown,
+  RefreshCw,
+  Plus,
+  X,
+  Settings2,
+  Activity,
+  LogOut,
+  Check,
+  Copy,
+  Terminal,
+  ShieldCheck,
+  LockKeyhole,
+  Globe2,
+  Tag,
+  Layers3,
+  Trash2,
+  AlertCircle,
+  Menu,
+  Database,
+  Server,
+  ExternalLink,
+  HardDrive,
+  Package,
+  CircleHelp,
+  ArrowDownToLine,
+} from "@lucide/vue";
+defineProps<{ name: string; size?: number }>();
+const icons: Record<string, any> = {
+  Boxes,
+  Box,
+  LayoutDashboard,
+  Search,
+  ArrowUpRight,
+  ArrowRight,
+  ChevronRight,
+  ChevronDown,
+  RefreshCw,
+  Plus,
+  X,
+  Settings2,
+  Activity,
+  LogOut,
+  Check,
+  Copy,
+  Terminal,
+  ShieldCheck,
+  LockKeyhole,
+  Globe2,
+  Tag,
+  Layers3,
+  Trash2,
+  AlertCircle,
+  Menu,
+  Database,
+  Server,
+  ExternalLink,
+  HardDrive,
+  Package,
+  CircleHelp,
+  ArrowDownToLine,
+};
+</script>
+<template>
+  <component
+    :is="icons[name] || icons.Box"
+    :size="size || 18"
+    :stroke-width="1.7"
+    aria-hidden="true"
+  />
+</template>
