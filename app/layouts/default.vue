@@ -213,7 +213,7 @@ const {
               />
             </div>
             <label class="tag-selector">
-              <span>镜像标签（倒序）</span>
+              <span>镜像标签</span>
               <select
                 :value="selectedTag"
                 aria-label="选择镜像标签"
@@ -223,7 +223,7 @@ const {
                   v-if="selectedTag && !tags.includes(selectedTag)"
                   :value="selectedTag"
                 >
-                  {{ selectedTag }}（当前标签）
+                  {{ selectedTag }}
                 </option>
                 <option v-for="tag in tags" :key="tag" :value="tag">
                   {{ tag }}
@@ -264,7 +264,7 @@ const {
                     </dd>
                   </div>
                   <div>
-                    <dt>镜像大小（所选架构压缩层）</dt>
+                    <dt>镜像大小</dt>
                     <dd>
                       {{ size(platformInfo?.size_bytes) }}
                     </dd>
@@ -274,7 +274,7 @@ const {
                     <dd>{{ date(platformInfo?.created_at) }}</dd>
                   </div>
                   <div>
-                    <dt>标签推送时间（代理记录）</dt>
+                    <dt>标签推送时间</dt>
                     <dd>
                       {{
                         detail.pushed_at ? date(detail.pushed_at) : "暂无记录"
