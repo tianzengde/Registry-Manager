@@ -97,7 +97,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker buildx imagetools inspect "${IMAGE}@${DIGEST}" --raw > /tmp/image-index.json
+          # GHCR 发布后可能短暂读取不到新摘要，有限重试后再验证平台。
+          verified=false
+          for attempt in 1 2 3 4 5; do
+            echo "镜像索引校验，第 ${attempt} 次尝试"
+            if docker buildx imagetools inspect "${IMAGE}@${DIGEST}" --raw > /tmp/image-index.json; then
+              verified=true
+              break
+            fi
+            sleep 3
+          done
+          if [[ "$verified" != true ]]; then exit 1; fi
           jq -e 'any(.manifests[]; .platform.os == "linux" and .platform.architecture == "amd64") and any(.manifests[]; .platform.os == "linux" and .platform.architecture == "arm64")' /tmp/image-index.json
           {
             echo '### Published image'
